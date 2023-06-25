@@ -1,0 +1,129 @@
+use std::mem::size_of_val;
+
+use anyhow::Context;
+use netlink_packet_utils::{
+    byteorder::{ByteOrder, NativeEndian},
+    nla::{Nla, NlaBuffer},
+    parsers::{parse_mac, parse_u32, parse_u64, parse_u8},
+    DecodeError, Emitable, Parseable,
+};
+
+use crate::mac80211_hwsim::structs::{ReceiverInfo, TXInfo, TXRate};
+
+use super::super::constants::*;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HwsimAttrs {
+    AddrTransmitter([u8; 6]),
+    Flags(u32),
+    RXRate(u32),
+    Signal(u32),
+    TXInfo(TXInfo),
+    Cookie(u64),
+    Freq(u32),
+    FrameHeader([u8; 32]),
+    FrameLength(u32),
+    ReceiverInfo(ReceiverInfo),
+}
+
+impl Nla for HwsimAttrs {
+    fn value_len(&self) -> usize {
+        use HwsimAttrs::*;
+        match self {
+            AddrTransmitter(v) => size_of_val(v),
+            Flags(v) => size_of_val(v),
+            RXRate(v) => size_of_val(v),
+            Signal(v) => size_of_val(v),
+            TXInfo(v) => v.buffer_len(),
+            Cookie(v) => size_of_val(v),
+            Freq(v) => size_of_val(v),
+            FrameHeader(_) => 0,
+            FrameLength(_) => 0,
+            ReceiverInfo(v) => v.buffer_len(),
+        }
+    }
+
+    fn kind(&self) -> u16 {
+        use HwsimAttrs::*;
+        match self {
+            AddrTransmitter(_) => HWSIM_ATTR_ADDR_TRANSMITTER,
+            Flags(_) => HWSIM_ATTR_FLAGS,
+            RXRate(_) => HWSIM_ATTR_RX_RATE,
+            Signal(_) => HWSIM_ATTR_SIGNAL,
+            TXInfo(_) => HWSIM_ATTR_TX_INFO,
+            Cookie(_) => HWSIM_ATTR_COOKIE,
+            Freq(_) => HWSIM_ATTR_FREQ,
+            FrameHeader(_) => HWSIM_ATTR_FRAME_HEADER,
+            FrameLength(_) => HWSIM_ATTR_FRAME_LENGTH,
+            ReceiverInfo(_) => HWSIM_ATTR_RECEIVER_INFO,
+        }
+    }
+
+    fn emit_value(&self, buffer: &mut [u8]) {
+        use HwsimAttrs::*;
+        match self {
+            AddrTransmitter(v) => {
+                buffer.copy_from_slice(v);
+            }
+            Flags(v) => NativeEndian::write_u32(buffer, *v),
+            RXRate(v) => NativeEndian::write_u32(buffer, *v),
+            Signal(v) => NativeEndian::write_u32(buffer, *v),
+            TXInfo(v) => v.emit(buffer),
+            Cookie(v) => NativeEndian::write_u64(buffer, *v),
+            Freq(v) => NativeEndian::write_u32(buffer, *v),
+            FrameHeader(_) => {}
+            FrameLength(_) => {}
+            ReceiverInfo(v) => v.emit(buffer),
+        }
+    }
+}
+
+impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for HwsimAttrs {
+    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+        let payload = buf.value();
+        Ok(match buf.kind() {
+            HWSIM_ATTR_ADDR_TRANSMITTER => Self::AddrTransmitter(
+                parse_mac(payload).context("failed to parse HWSIM_ATTR_ADDR_TRANSMITTER")?,
+            ),
+            HWSIM_ATTR_FLAGS => {
+                Self::Flags(parse_u32(payload).context("failed to parse HWSIM_ATTR_FLAGS")?)
+            }
+            HWSIM_ATTR_RX_RATE => {
+                Self::RXRate(parse_u32(payload).context("failed to parse HWSIM_ATTR_RX_RATE")?)
+            }
+            HWSIM_ATTR_TX_INFO => {
+                let mut tx_info: TXInfo = TXInfo::default();
+                let tx_rates_len = payload.len();
+                tx_info.tx_rates_count = tx_rates_len as i32 / 2;
+                for i in 0..tx_rates_len {
+                    if i >= 8 {
+                        break;
+                    }
+                    if i % 2 == 0 {
+                        tx_info.tx_rates[i / 2].idx = payload[i] as i8;
+                    } else {
+                        tx_info.tx_rates[i / 2].count = payload[i];
+                    }
+                }
+
+                Self::TXInfo(tx_info)
+            }
+            HWSIM_ATTR_COOKIE => {
+                Self::Cookie(parse_u64(payload).context("failed to parse HWSIM_ATTR_COOKIE")?)
+            }
+            HWSIM_ATTR_FREQ => {
+                Self::Freq(parse_u32(payload).context("failed to parse HWSIM_ATTR_FREQ")?)
+            }
+            HWSIM_ATTR_FRAME_HEADER => {
+                let mut frame_header: [u8; 32] = [0; 32];
+                let n = std::cmp::min(32, payload.len());
+                frame_header[..n].copy_from_slice(&payload[..n]);
+                Self::FrameHeader(frame_header)
+            }
+            HWSIM_ATTR_FRAME_LENGTH => Self::FrameLength(
+                parse_u32(payload).context("failed to parse HWSIM_ATTR_FRAME_LENGTH")?,
+            ),
+            kind => return Err(DecodeError::from(format!("Unknown NLA type: {kind}"))),
+        })
+    }
+}
