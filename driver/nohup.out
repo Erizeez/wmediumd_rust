@@ -1,0 +1,73 @@
+
+(process:338699): GLib-GIO-CRITICAL **: 09:22:42.863: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:338698): GLib-GIO-CRITICAL **: 09:22:42.866: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+Traceback (most recent call last):
+  File "/usr/bin/gnome-terminal", line 109, in <module>
+    main()
+  File "/usr/bin/gnome-terminal", line 100, in main
+    GnomeTerminal(sys.argv[:], mainloop)
+  File "/usr/bin/gnome-terminal", line 87, in __init__
+    self.name = self.find_new_name()
+  File "/usr/bin/gnome-terminal", line 25, in find_new_name
+    proxy = Gio.DBusProxy.new_for_bus_sync(
+gi.repository.GLib.GError: g-exec-error-quark: Failed to execute child process “dbus-launch” (No such file or directory) (8)
+Error in sys.excepthook:
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 153, in apport_excepthook
+Traceback (most recent call last):
+  File "/usr/bin/gnome-terminal", line 109, in <module>
+    main()
+  File "/usr/bin/gnome-terminal", line 100, in main
+    GnomeTerminal(sys.argv[:], mainloop)
+  File "/usr/bin/gnome-terminal", line 87, in __init__
+    self.name = self.find_new_name()
+  File "/usr/bin/gnome-terminal", line 25, in find_new_name
+    proxy = Gio.DBusProxy.new_for_bus_sync(
+gi.repository.GLib.GError: g-exec-error-quark: Failed to execute child process “dbus-launch” (No such file or directory) (8)
+    with os.fdopen(os.open(pr_filename,
+FileExistsError: [Errno 17] File exists: '/var/crash/_usr_bin_gnome-terminal.0.crash'
+
+Original exception was:
+Traceback (most recent call last):
+  File "/usr/bin/gnome-terminal", line 109, in <module>
+    main()
+  File "/usr/bin/gnome-terminal", line 100, in main
+    GnomeTerminal(sys.argv[:], mainloop)
+  File "/usr/bin/gnome-terminal", line 87, in __init__
+    self.name = self.find_new_name()
+  File "/usr/bin/gnome-terminal", line 25, in find_new_name
+    proxy = Gio.DBusProxy.new_for_bus_sync(
+gi.repository.GLib.GError: g-exec-error-quark: Failed to execute child process “dbus-launch” (No such file or directory) (8)
+Traceback (most recent call last):
+  File "/usr/bin/gnome-terminal", line 109, in <module>
+    main()
+  File "/usr/bin/gnome-terminal", line 100, in main
+    GnomeTerminal(sys.argv[:], mainloop)
+  File "/usr/bin/gnome-terminal", line 87, in __init__
+Traceback (most recent call last):
+  File "/usr/bin/gnome-terminal", line 109, in <module>
+    self.name = self.find_new_name()
+  File "/usr/bin/gnome-terminal", line 25, in find_new_name
+    proxy = Gio.DBusProxy.new_for_bus_sync(
+    main()
+  File "/usr/bin/gnome-terminal", line 100, in main
+gi.repository.GLib.GError: g-exec-error-quark: Failed to execute child process “dbus-launch” (No such file or directory) (8)
+    GnomeTerminal(sys.argv[:], mainloop)
+  File "/usr/bin/gnome-terminal", line 87, in __init__
+    self.name = self.find_new_name()
+  File "/usr/bin/gnome-terminal", line 25, in find_new_name
+    proxy = Gio.DBusProxy.new_for_bus_sync(
+gi.repository.GLib.GError: g-exec-error-quark: Failed to execute child process “dbus-launch” (No such file or directory) (8)
+
+(process:221261): GLib-GIO-CRITICAL **: 15:22:09.460: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:221260): GLib-GIO-CRITICAL **: 15:22:09.474: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:228537): GLib-GIO-CRITICAL **: 16:00:02.868: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:228538): GLib-GIO-CRITICAL **: 16:00:02.873: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:15355): GLib-GIO-CRITICAL **: 09:28:53.888: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:15354): GLib-GIO-CRITICAL **: 09:28:53.912: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed

@@ -8,6 +8,7 @@ pub const HWSIM_ATTR_SIGNAL: u16 = 6;
 pub const HWSIM_ATTR_TX_INFO: u16 = 7;
 pub const HWSIM_ATTR_COOKIE: u16 = 8;
 pub const HWSIM_ATTR_FREQ: u16 = 19;
+pub const HWSIM_ATTR_TX_INFO_FLAGS: u16 = 21;
 pub const HWSIM_ATTR_FRAME_HEADER: u16 = 25;
 pub const HWSIM_ATTR_FRAME_LENGTH: u16 = 26;
 pub const HWSIM_ATTR_RECEIVER_INFO: u16 = 28;

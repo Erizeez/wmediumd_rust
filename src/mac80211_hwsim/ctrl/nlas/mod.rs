@@ -8,7 +8,7 @@ use netlink_packet_utils::{
     DecodeError, Emitable, Parseable,
 };
 
-use crate::mac80211_hwsim::structs::{ReceiverInfo, TXInfo, TXRate};
+use crate::mac80211_hwsim::structs::{IEEE80211Header, ReceiverInfo, TXInfo, TXRate};
 
 use super::super::constants::*;
 
@@ -21,7 +21,8 @@ pub enum HwsimAttrs {
     TXInfo(TXInfo),
     Cookie(u64),
     Freq(u32),
-    FrameHeader([u8; 32]),
+    TXInfoFlags(u16),
+    FrameHeader(IEEE80211Header),
     FrameLength(u32),
     ReceiverInfo(ReceiverInfo),
 }
@@ -37,6 +38,7 @@ impl Nla for HwsimAttrs {
             TXInfo(v) => v.buffer_len(),
             Cookie(v) => size_of_val(v),
             Freq(v) => size_of_val(v),
+            TXInfoFlags(_) => 0,
             FrameHeader(_) => 0,
             FrameLength(_) => 0,
             ReceiverInfo(v) => v.buffer_len(),
@@ -53,6 +55,7 @@ impl Nla for HwsimAttrs {
             TXInfo(_) => HWSIM_ATTR_TX_INFO,
             Cookie(_) => HWSIM_ATTR_COOKIE,
             Freq(_) => HWSIM_ATTR_FREQ,
+            TXInfoFlags(_) => HWSIM_ATTR_TX_INFO_FLAGS,
             FrameHeader(_) => HWSIM_ATTR_FRAME_HEADER,
             FrameLength(_) => HWSIM_ATTR_FRAME_LENGTH,
             ReceiverInfo(_) => HWSIM_ATTR_RECEIVER_INFO,
@@ -63,17 +66,23 @@ impl Nla for HwsimAttrs {
         use HwsimAttrs::*;
         match self {
             AddrTransmitter(v) => {
-                buffer.copy_from_slice(v);
+                // buffer.copy_from_slice(v);
             }
             Flags(v) => NativeEndian::write_u32(buffer, *v),
             RXRate(v) => NativeEndian::write_u32(buffer, *v),
             Signal(v) => NativeEndian::write_u32(buffer, *v),
-            TXInfo(v) => v.emit(buffer),
+            TXInfo(v) => {
+                // println!("start emit");
+                // dbg!(v);
+                // v.emit(buffer);
+                // println!("end emit");
+            }
             Cookie(v) => NativeEndian::write_u64(buffer, *v),
             Freq(v) => NativeEndian::write_u32(buffer, *v),
+            TXInfoFlags(_) => {}
             FrameHeader(_) => {}
             FrameLength(_) => {}
-            ReceiverInfo(v) => v.emit(buffer),
+            ReceiverInfo(v) => (*v).emit(buffer),
         }
     }
 }
@@ -114,10 +123,18 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for HwsimAttrs {
             HWSIM_ATTR_FREQ => {
                 Self::Freq(parse_u32(payload).context("failed to parse HWSIM_ATTR_FREQ")?)
             }
+            HWSIM_ATTR_TX_INFO_FLAGS => Self::TXInfoFlags(0),
             HWSIM_ATTR_FRAME_HEADER => {
-                let mut frame_header: [u8; 32] = [0; 32];
-                let n = std::cmp::min(32, payload.len());
-                frame_header[..n].copy_from_slice(&payload[..n]);
+                let mut frame_header: IEEE80211Header = IEEE80211Header::default();
+                frame_header.frame_control.copy_from_slice(&payload[..2]);
+                frame_header.duration_id.copy_from_slice(&payload[2..4]);
+                frame_header.addr1.copy_from_slice(&payload[4..10]);
+                frame_header.addr2.copy_from_slice(&payload[10..16]);
+                frame_header.addr3.copy_from_slice(&payload[16..22]);
+                frame_header.seq_ctrl.copy_from_slice(&payload[22..24]);
+                frame_header.addr4.copy_from_slice(&payload[24..30]);
+                frame_header.qos.copy_from_slice(&payload[30..32]);
+
                 Self::FrameHeader(frame_header)
             }
             HWSIM_ATTR_FRAME_LENGTH => Self::FrameLength(

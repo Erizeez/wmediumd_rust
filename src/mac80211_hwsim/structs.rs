@@ -27,7 +27,9 @@ pub struct TXInfo {
 
 impl Emitable for TXInfo {
     fn buffer_len(&self) -> usize {
-        4 + self.tx_rates.iter().map(|r| r.buffer_len()).sum::<usize>()
+        // 4 + self.tx_rates.iter().map(|r| r.buffer_len()).sum::<usize>()
+        // 12
+        10
     }
 
     fn emit(&self, buffer: &mut [u8]) {
@@ -56,4 +58,17 @@ impl Emitable for ReceiverInfo {
         buffer[0..6].copy_from_slice(&self.addr);
         buffer[6..10].copy_from_slice(&self.signal.to_le_bytes());
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[repr(C, packed)]
+pub struct IEEE80211Header {
+    pub frame_control: [u8; 2],
+    pub duration_id: [u8; 2],
+    pub addr1: [u8; 6],
+    pub addr2: [u8; 6],
+    pub addr3: [u8; 6],
+    pub seq_ctrl: [u8; 2],
+    pub addr4: [u8; 6],
+    pub qos: [u8; 2],
 }
