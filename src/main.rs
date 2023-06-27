@@ -1,25 +1,13 @@
-use std::time::Duration;
-
-use anyhow::{bail, Error};
-use futures::{stream::Stream, StreamExt};
-use genetlink::{
-    self,
-    message::{map_from_rawgenlmsg, map_to_rawgenlmsg},
-    new_connection,
-};
-use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NLM_F_REQUEST};
+use anyhow::Error;
+use futures::StreamExt;
+use genetlink::{self, new_connection};
+use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_REQUEST};
 use netlink_packet_generic::{ctrl::nlas::GenlCtrlAttrs, GenlMessage};
-use netlink_packet_utils::{nla::Nla, ParseableParametrized};
-use tokio::time::sleep;
+use netlink_packet_utils::ParseableParametrized;
 
-use crate::mac80211_hwsim::{
-    ctrl::nlas::HwsimAttrs,
-    structs::{ReceiverInfo, TXInfo},
-};
+use crate::mac80211_hwsim::{ctrl::nlas::HwsimAttrs, structs::ReceiverInfo};
 
 use self::mac80211_hwsim::ctrl::*;
-
-use netlink_packet_core::NetlinkDeserializable;
 
 mod mac80211_hwsim;
 
@@ -34,13 +22,12 @@ async fn init_genetlink() -> Result<(), Error> {
     let mut nl_hdr = NetlinkHeader::default();
     nl_hdr.flags = NLM_F_REQUEST;
 
-    let nlmsg = NetlinkMessage::new(
+    let nlmsg: NetlinkMessage<GenlMessage<_>> = NetlinkMessage::new(
         nl_hdr,
-        GenlMessage::from_payload(GenlMAC {
+        NetlinkPayload::InnerMessage(GenlMessage::from_payload(GenlMAC {
             cmd: HwsimCmd::Register,
             nlas: vec![],
-        })
-        .into(),
+        })),
     );
     let (conn, mut handle, mut receiver) = new_connection()?;
     tokio::spawn(conn);
@@ -84,9 +71,9 @@ async fn init_genetlink() -> Result<(), Error> {
                                 HwsimAttrs::Flags(v) => nlas.push(HwsimAttrs::Flags(*v)),
                                 HwsimAttrs::TXInfo(v) => {
                                     nlas.push(HwsimAttrs::RXRate(v.tx_rates[0].idx as u32));
-                                    let info = TXInfo::default();
-                                    // nlas.push(HwsimAttrs::TXInfo(v.clone()));
-                                    nlas.push(HwsimAttrs::TXInfo(info));
+                                    // let info = TXInfo::default();
+                                    nlas.push(HwsimAttrs::TXInfo(v.clone()));
+                                    // nlas.push(HwsimAttrs::TXInfo(info));
                                 }
                                 HwsimAttrs::Cookie(v) => nlas.push(HwsimAttrs::Cookie(*v)),
                                 HwsimAttrs::Freq(v) => {
@@ -100,7 +87,7 @@ async fn init_genetlink() -> Result<(), Error> {
                         receiver_info.signal = signal;
                         nlas.push(HwsimAttrs::ReceiverInfo(receiver_info));
                         nlas.push(HwsimAttrs::Signal(signal));
-                        dbg!(&nlas);
+                        // dbg!(&nlas);
 
                         let mut nl_hdr = NetlinkHeader::default();
                         nl_hdr.flags = NLM_F_REQUEST;
@@ -113,19 +100,40 @@ async fn init_genetlink() -> Result<(), Error> {
                             })
                             .into(),
                         );
-                        print!("{}", nlmsg.buffer_len());
-                        nlmsg.finalize();
-                        let mut buffer = vec![0; nlmsg.buffer_len()];
-                        nlmsg.serialize(&mut buffer);
-                        print!("{:?}", buffer);
+                        // print!("{}", nlmsg.buffer_len());
+                        // nlmsg.finalize();
+                        // let mut buffer = vec![0; nlmsg.buffer_len()];
+                        // nlmsg.serialize(&mut buffer);
+                        // print!("{:?}", buffer);
                         // println!("send");
-                        match handle.request(nlmsg).await {
+                        match handle.notify(nlmsg).await {
                             Ok(_) => {}
-                            Err(_) => {
-                                println!("error")
-                            }
+                            Err(_) => {}
                         }
-                        println!("sended");
+                        //     Ok(_) => {
+                        //         // while let Some(i) = v.next().await {
+                        //         //     // println!("i: {:#?}", i.unwrap().payload);
+                        //         //     match i.unwrap().payload {
+                        //         //         netlink_packet_core::NetlinkPayload::Done => todo!(),
+                        //         //         netlink_packet_core::NetlinkPayload::Error(v) => {
+                        //         //             println!("error: {}", v.code);
+                        //         //             println!("{:#?}", v);
+                        //         //         }
+                        //         //         netlink_packet_core::NetlinkPayload::Ack(_) => todo!(),
+                        //         //         netlink_packet_core::NetlinkPayload::Noop => todo!(),
+                        //         //         netlink_packet_core::NetlinkPayload::Overrun(_) => todo!(),
+                        //         //         netlink_packet_core::NetlinkPayload::InnerMessage(_) => {
+                        //         //             todo!()
+                        //         //         }
+                        //         //         _ => todo!(),
+                        //         //     }
+                        //         // }
+                        //     }
+                        //     Err(_) => {
+                        //         println!("error")
+                        //     }
+                        // }
+                        // println!("sended");
                     }
                     Err(_) => {}
                 }

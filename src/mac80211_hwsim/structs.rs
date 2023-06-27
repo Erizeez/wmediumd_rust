@@ -2,7 +2,7 @@ use netlink_packet_utils::Emitable;
 
 use super::constants::*;
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct TXRate {
     pub idx: i8,
     pub count: u8,
@@ -19,7 +19,7 @@ impl Emitable for TXRate {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct TXInfo {
     pub tx_rates_count: i32,
     pub tx_rates: [TXRate; IEEE80211_TX_MAX_RATES],
@@ -29,17 +29,17 @@ impl Emitable for TXInfo {
     fn buffer_len(&self) -> usize {
         // 4 + self.tx_rates.iter().map(|r| r.buffer_len()).sum::<usize>()
         // 12
-        10
+        9
     }
 
     fn emit(&self, buffer: &mut [u8]) {
-        let mut offset = 0;
-        buffer[offset..offset + 4].copy_from_slice(&self.tx_rates_count.to_le_bytes());
-        offset += 4;
-        for rate in &self.tx_rates {
-            rate.emit(&mut buffer[offset..]);
-            offset += rate.buffer_len();
-        }
+        // let mut offset = 0;
+        // buffer[offset..offset + 4].copy_from_slice(&self.tx_rates_count.to_le_bytes());
+        // offset += 4;
+        // for rate in &self.tx_rates {
+        //     rate.emit(&mut buffer[offset..]);
+        //     offset += rate.buffer_len();
+        // }
     }
 }
 

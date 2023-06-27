@@ -4265,7 +4265,7 @@ static const struct genl_small_ops hwsim_ops[] = {
 		.cmd = HWSIM_CMD_REGISTER,
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = hwsim_register_received_nl,
-		.flags = GENL_UNS_ADMIN_PERM,
+		// .flags = GENL_UNS_ADMIN_PERM,
 	},
 	// {
 	// 	.cmd = HWSIM_CMD_FRAME,

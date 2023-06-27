@@ -12,5 +12,5 @@ netlink-packet-generic = "0.3.2"
 netlink-packet-utils = "0.5.2"
 futures = "0.3.16"
 anyhow = "1.0.42"
-tokio = { version = "1.9.0", features = ["full"] }
+tokio = { version = "1.28.2", features = ["full"] }
 #futures-async-stream = "0.2.6"

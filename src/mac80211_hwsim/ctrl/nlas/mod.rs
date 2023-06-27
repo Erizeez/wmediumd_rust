@@ -66,7 +66,7 @@ impl Nla for HwsimAttrs {
         use HwsimAttrs::*;
         match self {
             AddrTransmitter(v) => {
-                // buffer.copy_from_slice(v);
+                buffer.copy_from_slice(v);
             }
             Flags(v) => NativeEndian::write_u32(buffer, *v),
             RXRate(v) => NativeEndian::write_u32(buffer, *v),

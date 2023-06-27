@@ -71,3 +71,11 @@ gi.repository.GLib.GError: g-exec-error-quark: Failed to execute child process â
 (process:15355): GLib-GIO-CRITICAL **: 09:28:53.888: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
 
 (process:15354): GLib-GIO-CRITICAL **: 09:28:53.912: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:12979): GLib-GIO-CRITICAL **: 21:17:24.561: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:12980): GLib-GIO-CRITICAL **: 21:17:24.563: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:47576): GLib-GIO-CRITICAL **: 21:24:00.699: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:47577): GLib-GIO-CRITICAL **: 21:24:00.701: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
