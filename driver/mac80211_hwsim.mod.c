@@ -85,6 +85,7 @@ __used __section("__versions") = {
 	{ 0x22d91210, "ieee80211_get_tx_rates" },
 	{ 0x5ef6d9bb, "skb_queue_tail" },
 	{ 0xed5d64c4, "nla_put_64bit" },
+	{ 0xb43f9365, "ktime_get" },
 	{ 0x500ceea8, "virtqueue_add_outbuf" },
 	{ 0xee7525e7, "virtqueue_kick" },
 	{ 0x9fbb8c6f, "virtqueue_add_inbuf" },
@@ -111,13 +112,13 @@ __used __section("__versions") = {
 	{ 0x14b89635, "arm64_const_caps_ready" },
 	{ 0xb0c467f1, "skb_push" },
 	{ 0xa6c0c756, "skb_copy_expand" },
+	{ 0x1f857679, "ether_setup" },
 	{ 0x837b7b09, "__dynamic_pr_debug" },
 	{ 0x3afa0fb0, "ieee80211_tx_status_irqsafe" },
 	{ 0x75dec8ed, "ieee80211_rx_irqsafe" },
+	{ 0xc4f0da12, "ktime_get_with_offset" },
 	{ 0x1267f683, "skb_unlink" },
 	{ 0xf1db1704, "nla_memcpy" },
-	{ 0xc4f0da12, "ktime_get_with_offset" },
-	{ 0x1f857679, "ether_setup" },
 	{ 0x5487440f, "netlink_unicast" },
 	{ 0x6d2fc5a6, "net_namespace_list" },
 	{ 0xc5b6f236, "queue_work_on" },
@@ -186,4 +187,4 @@ MODULE_INFO(depends, "cfg80211,mac80211");
 
 MODULE_ALIAS("virtio:d0000001Dv*");
 
-MODULE_INFO(srcversion, "318D4AEB502F52EF8263EFC");
+MODULE_INFO(srcversion, "F77C6730AE390000FFB6461");

@@ -12,6 +12,7 @@ pub const HWSIM_ATTR_TX_INFO_FLAGS: u16 = 21;
 pub const HWSIM_ATTR_FRAME_HEADER: u16 = 25;
 pub const HWSIM_ATTR_FRAME_LENGTH: u16 = 26;
 pub const HWSIM_ATTR_RECEIVER_INFO: u16 = 28;
+pub const HWSIM_ATTR_FRAME_TIMESTAMP: u16 = 29;
 
 pub const HWSIM_CMD_REGISTER: u8 = 1;
 pub const HWSIM_CMD_FRAME: u8 = 2;
@@ -22,3 +23,5 @@ pub const HWSIM_YAWMD_RX_INFO: u8 = 10;
 pub const IEEE80211_AVAILABLE_RATES: isize = 12;
 pub const IEEE80211_TX_MAX_RATES: usize = 4;
 pub const IEEE80211_NUM_ACS: isize = 4;
+
+pub const MICROSECONDS_TO_NANOSECONDS: i64 = 1000;

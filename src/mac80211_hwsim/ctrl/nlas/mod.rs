@@ -25,6 +25,7 @@ pub enum HwsimAttrs {
     FrameHeader(IEEE80211Header),
     FrameLength(u32),
     ReceiverInfo(ReceiverInfo),
+    TimeStamp(i64),
 }
 
 impl Nla for HwsimAttrs {
@@ -42,6 +43,7 @@ impl Nla for HwsimAttrs {
             FrameHeader(_) => 0,
             FrameLength(_) => 0,
             ReceiverInfo(v) => v.buffer_len(),
+            TimeStamp(v) => size_of_val(v),
         }
     }
 
@@ -59,6 +61,7 @@ impl Nla for HwsimAttrs {
             FrameHeader(_) => HWSIM_ATTR_FRAME_HEADER,
             FrameLength(_) => HWSIM_ATTR_FRAME_LENGTH,
             ReceiverInfo(_) => HWSIM_ATTR_RECEIVER_INFO,
+            TimeStamp(_) => HWSIM_ATTR_FRAME_TIMESTAMP,
         }
     }
 
@@ -83,6 +86,7 @@ impl Nla for HwsimAttrs {
             FrameHeader(_) => {}
             FrameLength(_) => {}
             ReceiverInfo(v) => (*v).emit(buffer),
+            TimeStamp(v) => NativeEndian::write_i64(buffer, *v),
         }
     }
 }
@@ -139,6 +143,12 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for HwsimAttrs {
             }
             HWSIM_ATTR_FRAME_LENGTH => Self::FrameLength(
                 parse_u32(payload).context("failed to parse HWSIM_ATTR_FRAME_LENGTH")?,
+            ),
+            HWSIM_ATTR_FRAME_TIMESTAMP => Self::TimeStamp(
+                parse_u64(payload)
+                    .context("ailed to parse HWSIM_ATTR_FRAME_TIMESTAMP")?
+                    .try_into()
+                    .unwrap(),
             ),
             kind => return Err(DecodeError::from(format!("Unknown NLA type: {kind}"))),
         })

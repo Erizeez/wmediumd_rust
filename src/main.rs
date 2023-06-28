@@ -5,7 +5,9 @@ use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_R
 use netlink_packet_generic::GenlMessage;
 use netlink_packet_utils::ParseableParametrized;
 
-use crate::mac80211_hwsim::{ctrl::nlas::HwsimAttrs, structs::ReceiverInfo};
+use crate::mac80211_hwsim::{
+    constants::MICROSECONDS_TO_NANOSECONDS, ctrl::nlas::HwsimAttrs, structs::ReceiverInfo,
+};
 
 use self::mac80211_hwsim::ctrl::*;
 
@@ -78,6 +80,12 @@ async fn init_genetlink() -> Result<(), Error> {
                                 HwsimAttrs::Freq(v) => {
                                     new_nlas.push(HwsimAttrs::Freq(*v));
                                 }
+                                HwsimAttrs::TimeStamp(v) => {
+                                    new_nlas.push(HwsimAttrs::TimeStamp(
+                                        *v + 1000 * MICROSECONDS_TO_NANOSECONDS,
+                                    ));
+                                    println!("{}", &v);
+                                }
                                 _ => {}
                             }
                         }
@@ -86,6 +94,7 @@ async fn init_genetlink() -> Result<(), Error> {
                         receiver_info.signal = signal;
                         new_nlas.push(HwsimAttrs::ReceiverInfo(receiver_info));
                         new_nlas.push(HwsimAttrs::Signal(signal));
+
                         // dbg!(&nlas);
 
                         let mut nl_hdr = NetlinkHeader::default();

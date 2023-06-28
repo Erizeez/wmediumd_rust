@@ -37,6 +37,7 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
 #include "mac80211_hwsim.h"
+#include <linux/ktime.h>
 
 #define WARN_QUEUE 100
 #define MAX_QUEUE 200
@@ -780,6 +781,7 @@ static const struct nla_policy hwsim_genl_policy[HWSIM_ATTR_MAX + 1] = {
 	[HWSIM_ATTR_FRAME_LENGTH] = {.type = NLA_U32},
 	[HWSIM_ATTR_FRAME_ID] = {.type = NLA_U64},
 	[HWSIM_ATTR_RECEIVER_INFO] = {.type = NLA_BINARY},
+	[HWSIM_ATTR_FRAME_TIMESTAMP] = {.type = NLA_S64},
 };
 
 #if IS_REACHABLE(CONFIG_VIRTIO)
@@ -1309,6 +1311,9 @@ static void hwsim_yawmd_tx(struct ieee80211_hw *hw,
 	struct hwsim_tx_rate_flag tx_attempts_flags[IEEE80211_TX_MAX_RATES];
 	uintptr_t cookie;
 
+	ktime_t start_time = ktime_get();
+	s64 timestamp = ktime_to_ns(start_time);
+
 	// printk(KERN_INFO "mac80211_hwsim: %d.\n", dst_portid);
 
 	if (data->ps != PS_DISABLED)
@@ -1338,6 +1343,9 @@ static void hwsim_yawmd_tx(struct ieee80211_hw *hw,
 
 	if (nla_put(skb, HWSIM_ATTR_ADDR_TRANSMITTER,
 				ETH_ALEN, data->addresses[1].addr))
+		goto nla_put_failure;
+
+	if (nla_put_s64(skb, HWSIM_ATTR_FRAME_TIMESTAMP, timestamp, 0))
 		goto nla_put_failure;
 
 	/* The qos ctrl bytes come after the frame_control, duration, seq_num
@@ -3796,6 +3804,7 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 	int i;
 	bool found = false;
 	u32 recv_len = 0, rate_idx, freq;
+	s64 time_stamp;
 
 	// printk(KERN_INFO "mac80211_hwsim: rx!.\n");
 
@@ -3805,7 +3814,8 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 		!info->attrs[HWSIM_ATTR_SIGNAL] ||
 		!info->attrs[HWSIM_ATTR_TX_INFO] ||
 		!info->attrs[HWSIM_ATTR_RX_RATE] ||
-		!info->attrs[HWSIM_ATTR_FREQ])
+		!info->attrs[HWSIM_ATTR_FREQ] ||
+		!info->attrs[HWSIM_ATTR_FRAME_TIMESTAMP])
 		goto out;
 
 	if (!info->attrs[HWSIM_ATTR_RECEIVER_INFO])
@@ -3821,6 +3831,9 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 	ret_skb_cookie = nla_get_u64(info->attrs[HWSIM_ATTR_COOKIE]);
 	rate_idx = nla_get_u32(info->attrs[HWSIM_ATTR_RX_RATE]);
 	freq = nla_get_u32(info->attrs[HWSIM_ATTR_FREQ]);
+
+	time_stamp = nla_get_s64(info->attrs[HWSIM_ATTR_FRAME_TIMESTAMP]);
+	printk(KERN_INFO "mac80211_hwsim: time_stamp -- %lld --.\n", time_stamp);
 
 	data2 = get_hwsim_data_ref_from_addr(src);
 	if (!data2)
