@@ -3797,7 +3797,7 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 	bool found = false;
 	u32 recv_len = 0, rate_idx, freq;
 
-	printk(KERN_INFO "mac80211_hwsim: rx!.\n");
+	// printk(KERN_INFO "mac80211_hwsim: rx!.\n");
 
 	if (!info->attrs[HWSIM_ATTR_ADDR_TRANSMITTER] ||
 		!info->attrs[HWSIM_ATTR_FLAGS] ||

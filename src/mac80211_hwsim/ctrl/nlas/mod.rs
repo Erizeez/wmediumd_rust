@@ -4,7 +4,7 @@ use anyhow::Context;
 use netlink_packet_utils::{
     byteorder::{ByteOrder, NativeEndian},
     nla::{Nla, NlaBuffer},
-    parsers::{parse_mac, parse_u32, parse_u64, parse_u8},
+    parsers::{parse_mac, parse_u32, parse_u64},
     DecodeError, Emitable, Parseable,
 };
 

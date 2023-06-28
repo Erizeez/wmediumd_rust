@@ -2,7 +2,7 @@ use anyhow::Error;
 use futures::StreamExt;
 use genetlink::{self, new_connection};
 use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_REQUEST};
-use netlink_packet_generic::{ctrl::nlas::GenlCtrlAttrs, GenlMessage};
+use netlink_packet_generic::GenlMessage;
 use netlink_packet_utils::ParseableParametrized;
 
 use crate::mac80211_hwsim::{ctrl::nlas::HwsimAttrs, structs::ReceiverInfo};
@@ -55,7 +55,7 @@ async fn init_genetlink() -> Result<(), Error> {
                         //     _ => {}
                         // });
 
-                        let mut nlas = vec![];
+                        let mut new_nlas = vec![];
                         let mut receiver_info = ReceiverInfo::default();
 
                         for attr in &frame.nlas {
@@ -66,18 +66,17 @@ async fn init_genetlink() -> Result<(), Error> {
                                     } else {
                                         receiver_info.addr = [0x42, 0x0, 0x0, 0x0, 0x1, 0x0];
                                     }
-                                    nlas.push(HwsimAttrs::AddrTransmitter(v.clone()));
+                                    new_nlas.push(HwsimAttrs::AddrTransmitter(v.clone()));
                                 }
-                                HwsimAttrs::Flags(v) => nlas.push(HwsimAttrs::Flags(*v)),
+                                HwsimAttrs::Flags(v) => new_nlas.push(HwsimAttrs::Flags(*v)),
                                 HwsimAttrs::TXInfo(v) => {
-                                    nlas.push(HwsimAttrs::RXRate(v.tx_rates[0].idx as u32));
-                                    // let info = TXInfo::default();
-                                    nlas.push(HwsimAttrs::TXInfo(v.clone()));
-                                    // nlas.push(HwsimAttrs::TXInfo(info));
+                                    new_nlas.push(HwsimAttrs::RXRate(v.tx_rates[0].idx as u32));
+
+                                    new_nlas.push(HwsimAttrs::TXInfo(v.clone()));
                                 }
-                                HwsimAttrs::Cookie(v) => nlas.push(HwsimAttrs::Cookie(*v)),
+                                HwsimAttrs::Cookie(v) => new_nlas.push(HwsimAttrs::Cookie(*v)),
                                 HwsimAttrs::Freq(v) => {
-                                    nlas.push(HwsimAttrs::Freq(*v));
+                                    new_nlas.push(HwsimAttrs::Freq(*v));
                                 }
                                 _ => {}
                             }
@@ -85,8 +84,8 @@ async fn init_genetlink() -> Result<(), Error> {
 
                         let signal = (30 - 91) as u32;
                         receiver_info.signal = signal;
-                        nlas.push(HwsimAttrs::ReceiverInfo(receiver_info));
-                        nlas.push(HwsimAttrs::Signal(signal));
+                        new_nlas.push(HwsimAttrs::ReceiverInfo(receiver_info));
+                        new_nlas.push(HwsimAttrs::Signal(signal));
                         // dbg!(&nlas);
 
                         let mut nl_hdr = NetlinkHeader::default();
@@ -96,44 +95,15 @@ async fn init_genetlink() -> Result<(), Error> {
                             nl_hdr,
                             GenlMessage::from_payload(GenlMAC {
                                 cmd: HwsimCmd::YawmdRXInfo,
-                                nlas,
+                                nlas: new_nlas,
                             })
                             .into(),
                         );
-                        // print!("{}", nlmsg.buffer_len());
-                        // nlmsg.finalize();
-                        // let mut buffer = vec![0; nlmsg.buffer_len()];
-                        // nlmsg.serialize(&mut buffer);
-                        // print!("{:?}", buffer);
-                        // println!("send");
+
                         match handle.notify(nlmsg).await {
                             Ok(_) => {}
                             Err(_) => {}
                         }
-                        //     Ok(_) => {
-                        //         // while let Some(i) = v.next().await {
-                        //         //     // println!("i: {:#?}", i.unwrap().payload);
-                        //         //     match i.unwrap().payload {
-                        //         //         netlink_packet_core::NetlinkPayload::Done => todo!(),
-                        //         //         netlink_packet_core::NetlinkPayload::Error(v) => {
-                        //         //             println!("error: {}", v.code);
-                        //         //             println!("{:#?}", v);
-                        //         //         }
-                        //         //         netlink_packet_core::NetlinkPayload::Ack(_) => todo!(),
-                        //         //         netlink_packet_core::NetlinkPayload::Noop => todo!(),
-                        //         //         netlink_packet_core::NetlinkPayload::Overrun(_) => todo!(),
-                        //         //         netlink_packet_core::NetlinkPayload::InnerMessage(_) => {
-                        //         //             todo!()
-                        //         //         }
-                        //         //         _ => todo!(),
-                        //         //     }
-                        //         // }
-                        //     }
-                        //     Err(_) => {
-                        //         println!("error")
-                        //     }
-                        // }
-                        // println!("sended");
                     }
                     Err(_) => {}
                 }
@@ -165,54 +135,54 @@ async fn init_genetlink() -> Result<(), Error> {
     Ok(())
 }
 
-fn print_entry(entry: Vec<GenlCtrlAttrs>) {
-    let family_id = entry
-        .iter()
-        .find_map(|nla| {
-            if let GenlCtrlAttrs::FamilyId(id) = nla {
-                Some(*id)
-            } else {
-                None
-            }
-        })
-        .expect("Cannot find FamilyId attribute");
-    let family_name = entry
-        .iter()
-        .find_map(|nla| {
-            if let GenlCtrlAttrs::FamilyName(name) = nla {
-                Some(name.as_str())
-            } else {
-                None
-            }
-        })
-        .expect("Cannot find FamilyName attribute");
-    let version = entry
-        .iter()
-        .find_map(|nla| {
-            if let GenlCtrlAttrs::Version(ver) = nla {
-                Some(*ver)
-            } else {
-                None
-            }
-        })
-        .expect("Cannot find Version attribute");
-    let hdrsize = entry
-        .iter()
-        .find_map(|nla| {
-            if let GenlCtrlAttrs::HdrSize(hdr) = nla {
-                Some(*hdr)
-            } else {
-                None
-            }
-        })
-        .expect("Cannot find HdrSize attribute");
+// fn print_entry(entry: Vec<GenlCtrlAttrs>) {
+//     let family_id = entry
+//         .iter()
+//         .find_map(|nla| {
+//             if let GenlCtrlAttrs::FamilyId(id) = nla {
+//                 Some(*id)
+//             } else {
+//                 None
+//             }
+//         })
+//         .expect("Cannot find FamilyId attribute");
+//     let family_name = entry
+//         .iter()
+//         .find_map(|nla| {
+//             if let GenlCtrlAttrs::FamilyName(name) = nla {
+//                 Some(name.as_str())
+//             } else {
+//                 None
+//             }
+//         })
+//         .expect("Cannot find FamilyName attribute");
+//     let version = entry
+//         .iter()
+//         .find_map(|nla| {
+//             if let GenlCtrlAttrs::Version(ver) = nla {
+//                 Some(*ver)
+//             } else {
+//                 None
+//             }
+//         })
+//         .expect("Cannot find Version attribute");
+//     let hdrsize = entry
+//         .iter()
+//         .find_map(|nla| {
+//             if let GenlCtrlAttrs::HdrSize(hdr) = nla {
+//                 Some(*hdr)
+//             } else {
+//                 None
+//             }
+//         })
+//         .expect("Cannot find HdrSize attribute");
 
-    if hdrsize == 0 {
-        println!("0x{family_id:04x} {family_name} [Version {version}]");
-    } else {
-        println!(
-            "0x{family_id:04x} {family_name} [Version {version}] \
-            [Header {hdrsize} bytes]"
-        );
-    }
-}
+//     if hdrsize == 0 {
+//         println!("0x{family_id:04x} {family_name} [Version {version}]");
+//     } else {
+//         println!(
+//             "0x{family_id:04x} {family_name} [Version {version}] \
+//             [Header {hdrsize} bytes]"
+//         );
+//     }
+// }

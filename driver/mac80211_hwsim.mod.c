@@ -111,6 +111,12 @@ __used __section("__versions") = {
 	{ 0x14b89635, "arm64_const_caps_ready" },
 	{ 0xb0c467f1, "skb_push" },
 	{ 0xa6c0c756, "skb_copy_expand" },
+	{ 0x837b7b09, "__dynamic_pr_debug" },
+	{ 0x3afa0fb0, "ieee80211_tx_status_irqsafe" },
+	{ 0x75dec8ed, "ieee80211_rx_irqsafe" },
+	{ 0x1267f683, "skb_unlink" },
+	{ 0xf1db1704, "nla_memcpy" },
+	{ 0xc4f0da12, "ktime_get_with_offset" },
 	{ 0x1f857679, "ether_setup" },
 	{ 0x5487440f, "netlink_unicast" },
 	{ 0x6d2fc5a6, "net_namespace_list" },
@@ -121,16 +127,10 @@ __used __section("__versions") = {
 	{ 0x2f100592, "device_release_driver" },
 	{ 0x473ec7d5, "ieee80211_unregister_hw" },
 	{ 0x5ed5f867, "debugfs_remove" },
-	{ 0x828e22f4, "hrtimer_forward" },
-	{ 0x3afa0fb0, "ieee80211_tx_status_irqsafe" },
-	{ 0x837b7b09, "__dynamic_pr_debug" },
-	{ 0x75dec8ed, "ieee80211_rx_irqsafe" },
-	{ 0xc4f0da12, "ktime_get_with_offset" },
 	{ 0xdcbffd89, "__alloc_skb" },
-	{ 0x1267f683, "skb_unlink" },
-	{ 0xf1db1704, "nla_memcpy" },
-	{ 0x449ad0a7, "memcmp" },
+	{ 0x828e22f4, "hrtimer_forward" },
 	{ 0xb7f990e9, "rht_bucket_nested" },
+	{ 0x449ad0a7, "memcmp" },
 	{ 0x92997ed8, "_printk" },
 	{ 0x1d24c881, "___ratelimit" },
 	{ 0xe6d2458e, "do_trace_netlink_extack" },
@@ -186,4 +186,4 @@ MODULE_INFO(depends, "cfg80211,mac80211");
 
 MODULE_ALIAS("virtio:d0000001Dv*");
 
-MODULE_INFO(srcversion, "9AA3F79D92350B5F779726D");
+MODULE_INFO(srcversion, "318D4AEB502F52EF8263EFC");
