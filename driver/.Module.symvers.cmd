@@ -1,1 +1,0 @@
-cmd_/home/parallels/wmediumd_rust/driver/Module.symvers := sed 's/\.ko$$/\.o/' /home/parallels/wmediumd_rust/driver/modules.order | scripts/mod/modpost -m -a  -o /home/parallels/wmediumd_rust/driver/Module.symvers -e -i Module.symvers   -T -

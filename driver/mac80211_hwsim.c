@@ -3783,6 +3783,7 @@ static int hwsim_clone_frame(struct sk_buff *skb_2, const u8 *dst, u32 rate_idx,
 	rx_status.band = channel->band;
 	rx_status.rate_idx = rate_idx;
 	rx_status.signal = signal;
+	rx_status.mactime += 10000;
 
 	hdr = (void *)skb->data;
 
@@ -3804,9 +3805,8 @@ out:
 	return -EINVAL;
 }
 
-static u64 g_cookie = 0;
-static spinlock_t cookie_lock;
-static u8 target[] = {66, 0, 0, 0, 1, 0};
+// static u64 g_cookie = 0;
+// static spinlock_t cookie_lock;
 
 static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 						  struct genl_info *info)
@@ -3815,6 +3815,7 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 	struct ieee80211_hdr *hdr;
 	struct mac80211_hwsim_data *data2;
 	struct ieee80211_tx_info *txi;
+	struct ieee80211_rx_status *rxs;
 	struct hwsim_tx_rate *tx_attempts;
 	u64 ret_skb_cookie;
 	struct sk_buff *skb, *tmp;
@@ -3850,20 +3851,23 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 	ret_skb_cookie = nla_get_u64(info->attrs[HWSIM_ATTR_COOKIE]);
 	rate_idx = nla_get_u32(info->attrs[HWSIM_ATTR_RX_RATE]);
 	freq = nla_get_u32(info->attrs[HWSIM_ATTR_FREQ]);
+	time_stamp = nla_get_s64(info->attrs[HWSIM_ATTR_FRAME_TIMESTAMP]);
 
-	if (memcmp(src, target, sizeof(target)))
-	{
-		time_stamp = nla_get_s64(info->attrs[HWSIM_ATTR_FRAME_TIMESTAMP]);
-		// printk(KERN_INFO "mac80211_hwsim: time_stamp -- %lld --.\n", time_stamp);
-		// printk(KERN_INFO "mac80211_hwsim: cookie-- %lld --.\n", ret_skb_cookie);
-		// spin_lock(&cookie_lock);
-		if (ret_skb_cookie != g_cookie + 1)
-		{
-			printk(KERN_INFO "mac80211_hwsim: order wrong -- %lld -- %lld ", g_cookie, ret_skb_cookie);
-		}
-		g_cookie = ret_skb_cookie;
-		// spin_unlock(&cookie_lock);
-	}
+	// u8 target[] = {66, 0, 0, 0, 1, 0};
+
+	// if (memcmp(src, target, sizeof(target)))
+	// {
+
+	// 	// printk(KERN_INFO "mac80211_hwsim: time_stamp -- %lld --.\n", time_stamp);
+	// 	printk(KERN_INFO "mac80211_hwsim: cookie-- %lld --.\n", ret_skb_cookie);
+	// 	// 	// spin_lock(&cookie_lock);
+	// 	// 	if (ret_skb_cookie != g_cookie + 1)
+	// 	// 	{
+	// 	// 		printk(KERN_INFO "mac80211_hwsim: order wrong -- %lld -- %lld ", g_cookie, ret_skb_cookie);
+	// 	// 	}
+	// 	// 	g_cookie = ret_skb_cookie;
+	// 	// 	// spin_unlock(&cookie_lock);
+	// }
 
 	data2 = get_hwsim_data_ref_from_addr(src);
 	if (!data2)
@@ -3945,6 +3949,9 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 
 	if (hwsim_flags & HWSIM_TX_CTL_NO_ACK)
 		txi->flags |= IEEE80211_TX_STAT_NOACK_TRANSMITTED;
+
+	// rxs = IEEE80211_SKB_RXCB(skb);
+	// rxs->mactime += 10000;
 
 	ieee80211_tx_status_irqsafe(data2->hw, skb);
 	// printk(KERN_INFO "mac80211_hwsim: send TX Status.\n");
@@ -4866,7 +4873,7 @@ static int __init init_mac80211_hwsim(void)
 	}
 	rtnl_unlock();
 
-	spin_lock_init(&cookie_lock);
+	// spin_lock_init(&cookie_lock);
 
 	spin_lock_init(&deliver_lock);
 	timer_setup(&deliver_timer, periodic_deliver, 0);

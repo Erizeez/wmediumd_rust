@@ -1,1 +1,0 @@
-cmd_/home/parallels/wmediumd_rust/driver/modules.order := {   echo /home/parallels/wmediumd_rust/driver/mac80211_hwsim.ko; :; } | awk '!x[$$0]++' - > /home/parallels/wmediumd_rust/driver/modules.order

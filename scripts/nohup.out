@@ -1,0 +1,3 @@
+Gdk-Message: 09:56:08.178: Error reading events from display: Broken pipe
+
+(process:5214): GLib-GIO-CRITICAL **: 10:24:48.452: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
