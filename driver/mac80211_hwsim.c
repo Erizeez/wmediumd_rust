@@ -37,7 +37,8 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
 #include "mac80211_hwsim.h"
-#include <linux/ktime.h>
+#include <linux/kernel.h>
+#include <linux/timer.h>
 
 #define WARN_QUEUE 100
 #define MAX_QUEUE 200
@@ -3645,6 +3646,20 @@ out_err:
 	return res;
 }
 
+static struct timer_list deliver_timer;
+static spinlock_t deliver_lock;
+
+void periodic_deliver(struct timer_list *timer)
+{
+	spin_lock(&deliver_lock);
+
+	// printk(KERN_INFO "%s called (%ld)\n", __func__, jiffies);
+
+	spin_unlock(&deliver_lock);
+
+	mod_timer(&deliver_timer, jiffies + nsecs_to_jiffies(1000));
+}
+
 static void mac80211_hwsim_free(void)
 {
 	struct mac80211_hwsim_data *data;
@@ -3789,6 +3804,10 @@ out:
 	return -EINVAL;
 }
 
+static u64 g_cookie = 0;
+static spinlock_t cookie_lock;
+static u8 target[] = {66, 0, 0, 0, 1, 0};
+
 static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 						  struct genl_info *info)
 {
@@ -3832,8 +3851,19 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 	rate_idx = nla_get_u32(info->attrs[HWSIM_ATTR_RX_RATE]);
 	freq = nla_get_u32(info->attrs[HWSIM_ATTR_FREQ]);
 
-	time_stamp = nla_get_s64(info->attrs[HWSIM_ATTR_FRAME_TIMESTAMP]);
-	printk(KERN_INFO "mac80211_hwsim: time_stamp -- %lld --.\n", time_stamp);
+	if (memcmp(src, target, sizeof(target)))
+	{
+		time_stamp = nla_get_s64(info->attrs[HWSIM_ATTR_FRAME_TIMESTAMP]);
+		// printk(KERN_INFO "mac80211_hwsim: time_stamp -- %lld --.\n", time_stamp);
+		// printk(KERN_INFO "mac80211_hwsim: cookie-- %lld --.\n", ret_skb_cookie);
+		// spin_lock(&cookie_lock);
+		if (ret_skb_cookie != g_cookie + 1)
+		{
+			printk(KERN_INFO "mac80211_hwsim: order wrong -- %lld -- %lld ", g_cookie, ret_skb_cookie);
+		}
+		g_cookie = ret_skb_cookie;
+		// spin_unlock(&cookie_lock);
+	}
 
 	data2 = get_hwsim_data_ref_from_addr(src);
 	if (!data2)
@@ -4836,6 +4866,13 @@ static int __init init_mac80211_hwsim(void)
 	}
 	rtnl_unlock();
 
+	spin_lock_init(&cookie_lock);
+
+	spin_lock_init(&deliver_lock);
+	timer_setup(&deliver_timer, periodic_deliver, 0);
+	deliver_timer.expires = jiffies + msecs_to_jiffies(1000);
+	add_timer(&deliver_timer);
+
 	return 0;
 
 out_free_mon:
@@ -4869,5 +4906,6 @@ static void __exit exit_mac80211_hwsim(void)
 	unregister_netdev(hwsim_mon);
 	platform_driver_unregister(&mac80211_hwsim_driver);
 	unregister_pernet_device(&hwsim_net_ops);
+	del_timer(&deliver_timer);
 }
 module_exit(exit_mac80211_hwsim);

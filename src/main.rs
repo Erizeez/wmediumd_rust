@@ -84,7 +84,7 @@ async fn init_genetlink() -> Result<(), Error> {
                                     new_nlas.push(HwsimAttrs::TimeStamp(
                                         *v + 1000 * MICROSECONDS_TO_NANOSECONDS,
                                     ));
-                                    println!("{}", &v);
+                                    // println!("{}", &v);
                                 }
                                 _ => {}
                             }
