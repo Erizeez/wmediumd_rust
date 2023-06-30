@@ -5,13 +5,17 @@ use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_R
 use netlink_packet_generic::GenlMessage;
 use netlink_packet_utils::ParseableParametrized;
 
-use crate::mac80211_hwsim::{
-    constants::MICROSECONDS_TO_NANOSECONDS, ctrl::nlas::HwsimAttrs, structs::ReceiverInfo,
+use crate::{
+    mac80211_hwsim::{
+        constants::MICROSECONDS_TO_NANOSECONDS, ctrl::nlas::HwsimAttrs, structs::ReceiverInfo,
+    },
+    structs::{GenlRegister, GenlYawmdRXInfo, GenlYawmdTXInfo},
 };
 
 use self::mac80211_hwsim::ctrl::*;
 
 mod mac80211_hwsim;
+mod structs;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -21,20 +25,13 @@ async fn main() -> Result<(), Error> {
 
 async fn init_genetlink() -> Result<(), Error> {
     println!("Start Genetlink");
-    let mut nl_hdr = NetlinkHeader::default();
-    nl_hdr.flags = NLM_F_REQUEST;
 
-    let nlmsg: NetlinkMessage<GenlMessage<_>> = NetlinkMessage::new(
-        nl_hdr,
-        NetlinkPayload::InnerMessage(GenlMessage::from_payload(GenlMAC {
-            cmd: HwsimCmd::Register,
-            nlas: vec![],
-        })),
-    );
+    let genl_register = GenlRegister {};
+
     let (conn, mut handle, mut receiver) = new_connection()?;
     tokio::spawn(conn);
 
-    handle.notify(nlmsg).await?;
+    handle.notify(genl_register.generate_genl_message()).await?;
 
     while let Some(msg) = receiver.next().await {
         let msg = msg.0;
@@ -48,68 +45,30 @@ async fn init_genetlink() -> Result<(), Error> {
                             continue;
                         }
 
-                        // println!("receive");
-                        // frame = dbg!(frame);
-                        // frame.nlas.iter_map().for_each(|e| match e {
-                        //     HwsimAttrs::TXInfo(v) => frame
-                        //         .nlas
-                        //         .push(HwsimAttrs::RXRate(v.tx_rates[0].idx.try_into().unwrap())),
-                        //     _ => {}
-                        // });
-
-                        let mut new_nlas = vec![];
-                        let mut receiver_info = ReceiverInfo::default();
-
-                        for attr in &frame.nlas {
-                            match attr {
-                                HwsimAttrs::AddrTransmitter(v) => {
-                                    if v.eq(&[0x42, 0x0, 0x0, 0x0, 0x1, 0x0]) {
-                                        receiver_info.addr = [0x42, 0x0, 0x0, 0x0, 0x0, 0x0];
-                                    } else {
-                                        receiver_info.addr = [0x42, 0x0, 0x0, 0x0, 0x1, 0x0];
-                                    }
-                                    new_nlas.push(HwsimAttrs::AddrTransmitter(v.clone()));
-                                }
-                                HwsimAttrs::Flags(v) => new_nlas.push(HwsimAttrs::Flags(*v)),
-                                HwsimAttrs::TXInfo(v) => {
-                                    new_nlas.push(HwsimAttrs::RXRate(v.tx_rates[0].idx as u32));
-
-                                    new_nlas.push(HwsimAttrs::TXInfo(v.clone()));
-                                }
-                                HwsimAttrs::Cookie(v) => new_nlas.push(HwsimAttrs::Cookie(*v)),
-                                HwsimAttrs::Freq(v) => {
-                                    new_nlas.push(HwsimAttrs::Freq(*v));
-                                }
-                                HwsimAttrs::TimeStamp(v) => {
-                                    new_nlas.push(HwsimAttrs::TimeStamp(
-                                        *v + 1000 * MICROSECONDS_TO_NANOSECONDS,
-                                    ));
-                                    // println!("{}", &v);
-                                }
-                                _ => {}
-                            }
-                        }
-
                         let signal = (30 - 91) as u32;
+
+                        let data = parse_genl_message::<GenlYawmdTXInfo>(frame);
+
+                        let mut rx_info = GenlYawmdRXInfo::default();
+                        rx_info.addr_transmitter = data.addr_transmitter;
+                        rx_info.flags = data.flags;
+                        rx_info.rx_rate = data.tx_info[0].idx as u32;
+                        rx_info.signal = signal;
+                        rx_info.tx_info = data.tx_info;
+                        rx_info.cookie = data.cookie;
+                        rx_info.freq = data.freq;
+                        rx_info.timestamp = data.timestamp;
+
+                        let mut receiver_info = ReceiverInfo::default();
+                        if data.addr_transmitter.eq(&[0x42, 0x0, 0x0, 0x0, 0x1, 0x0]) {
+                            receiver_info.addr = [0x42, 0x0, 0x0, 0x0, 0x0, 0x0];
+                        } else {
+                            receiver_info.addr = [0x42, 0x0, 0x0, 0x0, 0x1, 0x0];
+                        }
                         receiver_info.signal = signal;
-                        new_nlas.push(HwsimAttrs::ReceiverInfo(receiver_info));
-                        new_nlas.push(HwsimAttrs::Signal(signal));
+                        rx_info.receiver_info = receiver_info;
 
-                        // dbg!(&nlas);
-
-                        let mut nl_hdr = NetlinkHeader::default();
-                        nl_hdr.flags = NLM_F_REQUEST;
-
-                        let mut nlmsg = NetlinkMessage::new(
-                            nl_hdr,
-                            GenlMessage::from_payload(GenlMAC {
-                                cmd: HwsimCmd::YawmdRXInfo,
-                                nlas: new_nlas,
-                            })
-                            .into(),
-                        );
-
-                        match handle.notify(nlmsg).await {
+                        match handle.notify(rx_info.generate_genl_message()).await {
                             Ok(_) => {}
                             Err(_) => {}
                         }

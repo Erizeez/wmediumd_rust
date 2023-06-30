@@ -1,7 +1,8 @@
 pub mod nlas;
 
 use anyhow::Context;
-use netlink_packet_generic::{GenlFamily, GenlHeader};
+use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NLM_F_REQUEST};
+use netlink_packet_generic::{GenlFamily, GenlHeader, GenlMessage};
 use netlink_packet_utils::{
     nla::{self, NlaBuffer, NlasIterator},
     DecodeError, Emitable, Parseable, ParseableParametrized,
@@ -15,6 +16,11 @@ pub enum HwsimCmd {
     Register,
     Frame,
     TXInfoFrame,
+    NewRadio,
+    DelRadio,
+    GetRadio,
+    AddMACAddr,
+    DelMACAddr,
     YawmdTXInfo,
     YawmdRXInfo,
 }
@@ -26,6 +32,11 @@ impl From<HwsimCmd> for u8 {
             Register => HWSIM_CMD_REGISTER,
             Frame => HWSIM_CMD_FRAME,
             TXInfoFrame => HWSIM_CMD_TX_INFO_FRAME,
+            NewRadio => HWSIM_CMD_NEW_RADIO,
+            DelRadio => HWSIM_CMD_DEL_RADIO,
+            GetRadio => HWSIM_CMD_GET_RADIO,
+            AddMACAddr => HWSIM_CMD_ADD_MAC_ADDR,
+            DelMACAddr => HWSIM_CMD_DEL_MAC_ADDR,
             YawmdTXInfo => HWSIM_YAWMD_TX_INFO,
             YawmdRXInfo => HWSIM_YAWMD_RX_INFO,
         }
@@ -41,6 +52,11 @@ impl TryFrom<u8> for HwsimCmd {
             HWSIM_CMD_REGISTER => Register,
             HWSIM_CMD_FRAME => Frame,
             HWSIM_CMD_TX_INFO_FRAME => TXInfoFrame,
+            HWSIM_CMD_NEW_RADIO => NewRadio,
+            HWSIM_CMD_DEL_RADIO => DelRadio,
+            HWSIM_CMD_GET_RADIO => GetRadio,
+            HWSIM_CMD_ADD_MAC_ADDR => AddMACAddr,
+            HWSIM_CMD_DEL_MAC_ADDR => DelMACAddr,
             HWSIM_YAWMD_TX_INFO => YawmdTXInfo,
             HWSIM_YAWMD_RX_INFO => YawmdRXInfo,
             cmd => return Err(DecodeError::from(format!("Unknown control command: {cmd}"))),
@@ -52,6 +68,18 @@ impl TryFrom<u8> for HwsimCmd {
 pub struct GenlMAC {
     pub cmd: HwsimCmd,
     pub nlas: Vec<HwsimAttrs>,
+}
+
+pub trait GenlAutoConstruct {
+    fn generate_genl_message(&self) -> NetlinkMessage<GenlMessage<GenlMAC>>;
+    fn parse(data: GenlMAC) -> Self;
+}
+
+pub fn parse_genl_message<T>(data: GenlMAC) -> T
+where
+    T: GenlAutoConstruct,
+{
+    T::parse(data)
 }
 
 impl GenlFamily for GenlMAC {

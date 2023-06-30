@@ -4,26 +4,44 @@ use anyhow::Context;
 use netlink_packet_utils::{
     byteorder::{ByteOrder, NativeEndian},
     nla::{Nla, NlaBuffer},
-    parsers::{parse_mac, parse_u32, parse_u64},
+    parsers::{parse_mac, parse_u16, parse_u32, parse_u64},
     DecodeError, Emitable, Parseable,
 };
 
-use crate::mac80211_hwsim::structs::{IEEE80211Header, ReceiverInfo, TXInfo, TXRate};
+use crate::mac80211_hwsim::structs::{IEEE80211Header, ReceiverInfo, TXInfo, TXInfoFlag};
 
 use super::super::constants::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HwsimAttrs {
-    AddrTransmitter([u8; 6]),
+    Unspec(),
+    AddrReceiver(),
+    AddrTransmitter([u8; ETH_ALEN]),
+    Frame(),
     Flags(u32),
     RXRate(u32),
     Signal(u32),
-    TXInfo(TXInfo),
+    TXInfo([TXInfo; IEEE80211_TX_MAX_RATES]),
     Cookie(u64),
+    Channels(u32),
+    RadioID(),
+    RegHintAlpha2(),
+    RegCustomReg(u32),
+    RegStrictReg(bool),
+    SupportP2PDevice(bool),
+    UseChanctx(bool),
+    DestroyRadioOnClose(bool),
+    RadioName(String),
+    NoVif(bool),
     Freq(u32),
-    TXInfoFlags(u16),
+    Pad(),
+    TXInfoFlags([TXInfoFlag; IEEE80211_TX_MAX_RATES]),
+    PermAddr(),
+    IftypeSupport(u32),
+    CipherSupport(),
     FrameHeader(IEEE80211Header),
     FrameLength(u32),
+    FrameID(),
     ReceiverInfo(ReceiverInfo),
     TimeStamp(i64),
 }
@@ -32,16 +50,34 @@ impl Nla for HwsimAttrs {
     fn value_len(&self) -> usize {
         use HwsimAttrs::*;
         match self {
+            Unspec() => todo!(),
+            AddrReceiver() => todo!(),
             AddrTransmitter(v) => size_of_val(v),
+            Frame() => todo!(),
             Flags(v) => size_of_val(v),
             RXRate(v) => size_of_val(v),
             Signal(v) => size_of_val(v),
-            TXInfo(v) => v.buffer_len(),
+            TXInfo(v) => v[0].buffer_len() * IEEE80211_TX_MAX_RATES,
             Cookie(v) => size_of_val(v),
+            Channels(v) => todo!(),
+            RadioID() => todo!(),
+            RegHintAlpha2() => todo!(),
+            RegCustomReg(v) => todo!(),
+            RegStrictReg(v) => todo!(),
+            SupportP2PDevice(v) => todo!(),
+            UseChanctx(v) => todo!(),
+            DestroyRadioOnClose(v) => todo!(),
+            RadioName(v) => todo!(),
+            NoVif(v) => todo!(),
             Freq(v) => size_of_val(v),
+            Pad() => todo!(),
             TXInfoFlags(_) => 0,
+            PermAddr() => todo!(),
+            IftypeSupport(v) => todo!(),
+            CipherSupport() => todo!(),
             FrameHeader(_) => 0,
             FrameLength(_) => 0,
+            FrameID() => todo!(),
             ReceiverInfo(v) => v.buffer_len(),
             TimeStamp(v) => size_of_val(v),
         }
@@ -50,16 +86,34 @@ impl Nla for HwsimAttrs {
     fn kind(&self) -> u16 {
         use HwsimAttrs::*;
         match self {
+            Unspec() => HWSIM_ATTR_UNSPEC,
+            AddrReceiver() => HWSIM_ATTR_ADDR_RECEIVER,
             AddrTransmitter(_) => HWSIM_ATTR_ADDR_TRANSMITTER,
+            Frame() => HWSIM_ATTR_FRAME,
             Flags(_) => HWSIM_ATTR_FLAGS,
             RXRate(_) => HWSIM_ATTR_RX_RATE,
             Signal(_) => HWSIM_ATTR_SIGNAL,
             TXInfo(_) => HWSIM_ATTR_TX_INFO,
             Cookie(_) => HWSIM_ATTR_COOKIE,
+            Channels(_) => HWSIM_ATTR_CHANNELS,
+            RadioID() => HWSIM_ATTR_RADIO_ID,
+            RegHintAlpha2() => HWSIM_ATTR_REG_HINT_ALPHA2,
+            RegCustomReg(_) => HWSIM_ATTR_REG_CUSTOM_REG,
+            RegStrictReg(_) => HWSIM_ATTR_REG_STRICT_REG,
+            SupportP2PDevice(_) => HWSIM_ATTR_SUPPORT_P2P_DEVICE,
+            UseChanctx(_) => HWSIM_ATTR_USE_CHANCTX,
+            DestroyRadioOnClose(_) => HWSIM_ATTR_DESTROY_RADIO_ON_CLOSE,
+            RadioName(_) => HWSIM_ATTR_RADIO_NAME,
+            NoVif(_) => HWSIM_ATTR_NO_VIF,
             Freq(_) => HWSIM_ATTR_FREQ,
+            Pad() => HWSIM_ATTR_PAD,
             TXInfoFlags(_) => HWSIM_ATTR_TX_INFO_FLAGS,
+            PermAddr() => HWSIM_ATTR_PERM_ADDR,
+            IftypeSupport(_) => HWSIM_ATTR_IFTYPE_SUPPORT,
+            CipherSupport() => HWSIM_ATTR_CIPHER_SUPPORT,
             FrameHeader(_) => HWSIM_ATTR_FRAME_HEADER,
             FrameLength(_) => HWSIM_ATTR_FRAME_LENGTH,
+            FrameID() => HWSIM_ATTR_FRAME_ID,
             ReceiverInfo(_) => HWSIM_ATTR_RECEIVER_INFO,
             TimeStamp(_) => HWSIM_ATTR_FRAME_TIMESTAMP,
         }
@@ -68,9 +122,12 @@ impl Nla for HwsimAttrs {
     fn emit_value(&self, buffer: &mut [u8]) {
         use HwsimAttrs::*;
         match self {
+            Unspec() => todo!(),
+            AddrReceiver() => todo!(),
             AddrTransmitter(v) => {
                 buffer.copy_from_slice(v);
             }
+            Frame() => todo!(),
             Flags(v) => NativeEndian::write_u32(buffer, *v),
             RXRate(v) => NativeEndian::write_u32(buffer, *v),
             Signal(v) => NativeEndian::write_u32(buffer, *v),
@@ -81,10 +138,25 @@ impl Nla for HwsimAttrs {
                 // println!("end emit");
             }
             Cookie(v) => NativeEndian::write_u64(buffer, *v),
+            Channels(v) => todo!(),
+            RadioID() => todo!(),
+            RegHintAlpha2() => todo!(),
+            RegCustomReg(v) => todo!(),
+            RegStrictReg(v) => todo!(),
+            SupportP2PDevice(v) => todo!(),
+            UseChanctx(v) => todo!(),
+            DestroyRadioOnClose(v) => todo!(),
+            RadioName(v) => todo!(),
+            NoVif(v) => todo!(),
             Freq(v) => NativeEndian::write_u32(buffer, *v),
+            Pad() => todo!(),
             TXInfoFlags(_) => {}
+            PermAddr() => todo!(),
+            IftypeSupport(v) => todo!(),
+            CipherSupport() => todo!(),
             FrameHeader(_) => {}
             FrameLength(_) => {}
+            FrameID() => todo!(),
             ReceiverInfo(v) => (*v).emit(buffer),
             TimeStamp(v) => NativeEndian::write_i64(buffer, *v),
         }
@@ -105,18 +177,14 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for HwsimAttrs {
                 Self::RXRate(parse_u32(payload).context("failed to parse HWSIM_ATTR_RX_RATE")?)
             }
             HWSIM_ATTR_TX_INFO => {
-                let mut tx_info: TXInfo = TXInfo::default();
-                let tx_rates_len = payload.len();
-                tx_info.tx_rates_count = tx_rates_len as i32 / 2;
-                for i in 0..tx_rates_len {
-                    if i >= 8 {
-                        break;
-                    }
-                    if i % 2 == 0 {
-                        tx_info.tx_rates[i / 2].idx = payload[i] as i8;
-                    } else {
-                        tx_info.tx_rates[i / 2].count = payload[i];
-                    }
+                let mut tx_info: [TXInfo; IEEE80211_TX_MAX_RATES] =
+                    [TXInfo::default(); IEEE80211_TX_MAX_RATES];
+                let mut offset = 0;
+
+                for i in 0..IEEE80211_TX_MAX_RATES {
+                    tx_info[i].idx = payload[offset] as i8;
+                    tx_info[i].count = payload[offset + 1];
+                    offset += 2;
                 }
 
                 Self::TXInfo(tx_info)
@@ -127,7 +195,20 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for HwsimAttrs {
             HWSIM_ATTR_FREQ => {
                 Self::Freq(parse_u32(payload).context("failed to parse HWSIM_ATTR_FREQ")?)
             }
-            HWSIM_ATTR_TX_INFO_FLAGS => Self::TXInfoFlags(0),
+            HWSIM_ATTR_TX_INFO_FLAGS => {
+                let mut tx_info_flags: [TXInfoFlag; IEEE80211_TX_MAX_RATES] =
+                    [TXInfoFlag::default(); IEEE80211_TX_MAX_RATES];
+                let mut offset = 0;
+
+                for i in 0..IEEE80211_TX_MAX_RATES {
+                    tx_info_flags[i].idx = payload[offset] as i8;
+                    tx_info_flags[i].flags = parse_u16(&payload[offset + 1..offset + 3])
+                        .context("failed to parse HWSIM_ATTR_TX_INFO_FLAGS")?;
+                    offset += 3;
+                }
+
+                Self::TXInfoFlags(tx_info_flags)
+            }
             HWSIM_ATTR_FRAME_HEADER => {
                 let mut frame_header: IEEE80211Header = IEEE80211Header::default();
                 frame_header.frame_control.copy_from_slice(&payload[..2]);

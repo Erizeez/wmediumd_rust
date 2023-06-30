@@ -4,13 +4,13 @@ use netlink_packet_utils::Emitable;
 
 use super::constants::*;
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct TXRate {
+#[derive(Clone, Debug, PartialEq, Eq, Default, Copy)]
+pub struct TXInfo {
     pub idx: i8,
     pub count: u8,
 }
 
-impl Emitable for TXRate {
+impl Emitable for TXInfo {
     fn buffer_len(&self) -> usize {
         size_of_val(&self.idx) + size_of_val(&self.count)
     }
@@ -21,23 +21,20 @@ impl Emitable for TXRate {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct TXInfo {
-    pub tx_rates_count: i32,
-    pub tx_rates: [TXRate; IEEE80211_TX_MAX_RATES],
+#[derive(Clone, Debug, PartialEq, Eq, Default, Copy)]
+pub struct TXInfoFlag {
+    pub idx: i8,
+    pub flags: u16,
 }
 
-impl Emitable for TXInfo {
+impl Emitable for TXInfoFlag {
     fn buffer_len(&self) -> usize {
-        self.tx_rates.iter().map(|r| r.buffer_len()).sum::<usize>()
+        size_of_val(&self.idx) + size_of_val(&self.flags)
     }
 
     fn emit(&self, buffer: &mut [u8]) {
-        let mut offset = 0;
-        for rate in &self.tx_rates {
-            rate.emit(&mut buffer[offset..]);
-            offset += rate.buffer_len();
-        }
+        buffer[0] = self.idx as u8;
+        buffer[1..].copy_from_slice(&self.flags.to_le_bytes());
     }
 }
 
