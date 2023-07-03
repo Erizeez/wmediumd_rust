@@ -1,0 +1,12 @@
+channels: 2
+support_p2p_device: true
+use_chanctx: false
+destroy_radio_on_close: true
+no_vif: false
+perm_addr:
+- 0x66
+- 0x0
+- 0x0
+- 0x0
+- 0x0
+- 0x0

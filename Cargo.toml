@@ -3,6 +3,13 @@ name = "wmediumd_rust"
 version = "0.1.0"
 edition = "2021"
 
+[target.x86_64-unknown-linux-gnu]
+runner = 'sudo -E'
+
+[target.aarch64-unknown-linux-gnu]
+runner = 'sudo -E'
+
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -10,7 +17,13 @@ genetlink = "0.2.4"
 netlink-packet-core = "0.5.0"
 netlink-packet-generic = "0.3.2"
 netlink-packet-utils = "0.5.2"
+netlink-sys = "0.8.5"
 futures = "0.3.16"
 anyhow = "1.0.42"
 tokio = { version = "1.28.2", features = ["full"] }
+bytemuck = "1.13.1"
+serde = { version = "1.0.164", features = ["derive"] }
+serde_yaml = "0.9.22"
+libc = "0.2.147"
+netns-rs = "0.1.0"
 #futures-async-stream = "0.2.6"

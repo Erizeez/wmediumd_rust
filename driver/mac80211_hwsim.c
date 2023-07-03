@@ -2922,6 +2922,16 @@ static int append_radio_msg(struct sk_buff *skb, int id,
 			return ret;
 	}
 
+	// if (param->perm_addr)
+	// {
+	// 	// printk(KERN_INFO "mac80211_hwsim: %d.\n", param->perm_addr[0]);
+	// 	ret = nla_put(skb, HWSIM_ATTR_PERM_ADDR,
+	// 				  ETH_ALEN, param->perm_addr);
+	// 	kfree(param->perm_addr);
+	// 	if (ret < 0)
+	// 		return ret;
+	// }
+
 	return 0;
 }
 
@@ -3633,6 +3643,10 @@ static int mac80211_hwsim_get_radio(struct sk_buff *skb,
 	param.regd = data->regd;
 	param.channels = data->channels;
 	param.hwname = wiphy_name(data->hw->wiphy);
+	// printk(KERN_INFO "mac80211_hwsim: %d -0- %d,%d,%d,%d,%d,%d\n", data->idx, data->addresses[0].addr[0], data->addresses[0].addr[1], data->addresses[0].addr[2], data->addresses[0].addr[3], data->addresses[0].addr[4], data->addresses[0].addr[5]);
+	// printk(KERN_INFO "mac80211_hwsim: %d -1- %d,%d,%d,%d,%d,%d\n", data->idx, data->addresses[1].addr[0], data->addresses[1].addr[1], data->addresses[1].addr[2], data->addresses[1].addr[3], data->addresses[1].addr[4], data->addresses[1].addr[5]);
+	// param.perm_addr = kmalloc(ETH_ALEN * sizeof(u8), GFP_KERNEL);
+	// memcpy((void *)param.perm_addr, data->addresses[0].addr, ETH_ALEN);
 
 	res = append_radio_msg(skb, data->idx, &param);
 	if (res < 0)
@@ -3713,7 +3727,10 @@ static void hwsim_register_wmediumd(struct net *net, u32 portid)
 	list_for_each_entry(data, &hwsim_radios, list)
 	{
 		if (data->netgroup == hwsim_net_get_netgroup(net))
+		{
 			data->wmediumd = portid;
+			printk(KERN_INFO "mac80211_hwsim: register -0- %d,%d,%d,%d,%d,%d\n", data->addresses[0].addr[0], data->addresses[0].addr[1], data->addresses[0].addr[2], data->addresses[0].addr[3], data->addresses[0].addr[4], data->addresses[0].addr[5]);
+		}
 	}
 	spin_unlock_bh(&hwsim_radio_lock);
 }
@@ -4026,6 +4043,8 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 	const char *hwname = NULL;
 	int ret;
 
+	printk(KERN_INFO "mac80211_hwsim: new radio.\n");
+
 	param.reg_strict = info->attrs[HWSIM_ATTR_REG_STRICT_REG];
 	param.p2p_device = info->attrs[HWSIM_ATTR_SUPPORT_P2P_DEVICE];
 	param.channels = channels;
@@ -4041,8 +4060,13 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 		return -EINVAL;
 	}
 
+	// printk(KERN_INFO "mac80211_hwsim: 1.\n");
+
 	if (info->attrs[HWSIM_ATTR_NO_VIF])
+	{
 		param.no_vif = true;
+		// printk(KERN_INFO "mac80211_hwsim: no vif.\n");
+	}
 
 	if (info->attrs[HWSIM_ATTR_USE_CHANCTX])
 		param.use_chanctx = true;
@@ -4078,6 +4102,7 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 
 		param.perm_addr = nla_data(info->attrs[HWSIM_ATTR_PERM_ADDR]);
 	}
+	// printk(KERN_INFO "mac80211_hwsim: 2.\n");
 
 	if (info->attrs[HWSIM_ATTR_IFTYPE_SUPPORT])
 	{
@@ -4096,6 +4121,7 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 	{
 		param.iftypes = HWSIM_IFTYPE_SUPPORT_MASK;
 	}
+	// printk(KERN_INFO "mac80211_hwsim: 3.\n");
 
 	/* ensure both flag and iftype support is honored */
 	if (param.p2p_device ||
@@ -4139,6 +4165,8 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 		}
 	}
 
+	// printk(KERN_INFO "mac80211_hwsim: 4.\n");
+
 	if (info->attrs[HWSIM_ATTR_RADIO_NAME])
 	{
 		hwname = kstrndup((char *)nla_data(info->attrs[HWSIM_ATTR_RADIO_NAME]),
@@ -4149,7 +4177,12 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 		param.hwname = hwname;
 	}
 
+	// printk(KERN_INFO "mac80211_hwsim: 5.\n");
+
 	ret = mac80211_hwsim_new_radio(info, &param);
+
+	// printk(KERN_INFO "mac80211_hwsim: finally -- %d -.\n", ret);
+
 	kfree(hwname);
 	return ret;
 }
