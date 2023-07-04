@@ -3800,7 +3800,7 @@ static int hwsim_clone_frame(struct sk_buff *skb_2, const u8 *dst, u32 rate_idx,
 	rx_status.band = channel->band;
 	rx_status.rate_idx = rate_idx;
 	rx_status.signal = signal;
-	rx_status.mactime += 10000;
+	// rx_status.mactime += 10000;
 
 	hdr = (void *)skb->data;
 
@@ -3811,8 +3811,10 @@ static int hwsim_clone_frame(struct sk_buff *skb_2, const u8 *dst, u32 rate_idx,
 	memcpy(IEEE80211_SKB_RXCB(skb), &rx_status, sizeof(rx_status));
 	data2->rx_pkts++;
 	data2->rx_bytes += skb->len;
+
+	printk(KERN_INFO "mac80211_hwsim: rx!.\n");
 	ieee80211_rx_irqsafe(data2->hw, skb);
-	// printk(KERN_INFO "mac80211_hwsim: send Frame.\n");
+	printk(KERN_INFO "mac80211_hwsim: send Frame.\n");
 
 	return 0;
 err:
@@ -3842,8 +3844,6 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 	bool found = false;
 	u32 recv_len = 0, rate_idx, freq;
 	s64 time_stamp;
-
-	// printk(KERN_INFO "mac80211_hwsim: rx!.\n");
 
 	if (!info->attrs[HWSIM_ATTR_ADDR_TRANSMITTER] ||
 		!info->attrs[HWSIM_ATTR_FLAGS] ||
@@ -3919,6 +3919,8 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 	/* not found */
 	if (!found)
 		goto out;
+
+	// printk(KERN_INFO "mac80211_hwsim: rx!.\n");
 
 	// send the frame to the destination station
 	if (recv_len > 0)

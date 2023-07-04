@@ -4,12 +4,14 @@ use libc::{
     SOL_SOCKET, SO_BINDTODEVICE,
 };
 use netns_rs::NetNs;
+use std::collections::HashMap;
 use std::env;
 use std::os::fd::AsRawFd;
 use std::time::Duration;
 use std::{ffi::CString, os::fd::RawFd};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::broadcast::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::time::sleep;
 
 use anyhow::Error;
@@ -39,40 +41,81 @@ mod config;
 mod mac80211_hwsim;
 mod structs;
 
+#[derive(Clone)]
+struct RadioInfo {
+    radio: Radio,
+    tx: UnboundedSender<GenlYawmdRXInfo>,
+}
+
+#[derive(Clone, Debug)]
+struct TXInfo {
+    tx: UnboundedSender<GenlYawmdRXInfo>,
+    mac: HwsimRadio,
+}
+
 #[tokio::main]
 async fn main() {
     // tokio::spawn(init_genetlink("./config/first_link.yaml", "ns0"));
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("Please provide a positive integer as a command line argument.");
-        return;
+
+    let config_path = "./config/topology.yaml";
+    let config = load_config(config_path);
+
+    let num = config.radios.len();
+
+    println!("Ready to spawn {} radios.", num);
+
+    let mut radio_infos: HashMap<usize, RadioInfo> = HashMap::new();
+
+    let mut rxs: HashMap<usize, UnboundedReceiver<GenlYawmdRXInfo>> = HashMap::new();
+
+    for i in 0..num {
+        let (tx, rx) = mpsc::unbounded_channel::<GenlYawmdRXInfo>();
+        rxs.insert(config.radios[i].id, rx);
+        radio_infos.insert(
+            config.radios[i].id,
+            RadioInfo {
+                radio: config.radios[i].clone(),
+                tx,
+            },
+        );
     }
-
-    let input: Result<u32, _> = args[1].parse();
-    let template_path = "./config/single_radio_template.yaml";
-    let radio_template = load_radio(template_path);
-
-    let num: u32;
-
-    match input {
-        Ok(value) => {
-            num = value;
-        }
-        Err(_) => {
-            println!("Invalid input. Please provide a positive integer.");
-            return;
-        }
-    };
-
-    println!("Ready to spawn {} links.", num);
 
     let (terminate_tx, terminate_rx) = broadcast::channel::<()>(num as usize);
 
-    let handles = (0..num)
-        .map(|id| {
-            tokio::spawn(single_pair_process(
-                id,
-                radio_template.clone(),
+    let handles = radio_infos
+        .iter()
+        .map(|(id, radio_info)| {
+            let mut txs: Vec<TXInfo> = vec![];
+            // println!("{}", id);
+            config.links.iter().for_each(|link| {
+                if link.src == *id {
+                    let info = radio_infos.get(&link.dst);
+                    txs.push(TXInfo {
+                        tx: radio_info.tx.clone(),
+                        mac: HwsimRadio {
+                            addr: info.unwrap().radio.perm_addr.clone(),
+                            hw_addr: info.unwrap().radio.perm_addr.clone(),
+                        },
+                    });
+                } else if link.dst == *id && link.mutual {
+                    let info = radio_infos.get(&link.src);
+                    txs.push(TXInfo {
+                        tx: radio_info.tx.clone(),
+                        mac: HwsimRadio {
+                            addr: info.unwrap().radio.perm_addr.clone(),
+                            hw_addr: info.unwrap().radio.perm_addr.clone(),
+                        },
+                    });
+                }
+            });
+
+            // println!("{:?}", txs);
+
+            tokio::spawn(radio_process(
+                *id,
+                (*radio_info).clone(),
+                txs,
+                rxs.remove(id).unwrap(),
                 terminate_rx.resubscribe(),
             ))
         })
@@ -100,6 +143,7 @@ async fn main() {
 
 type MACAddress = [u8; ETH_ALEN];
 
+#[derive(Clone, Debug)]
 pub struct HwsimRadio {
     addr: MACAddress,
     hw_addr: MACAddress,
@@ -149,20 +193,36 @@ macro_rules! mac_array {
     }};
 }
 
-async fn single_pair_process(id: u32, template: Radio, mut terminate_rx: broadcast::Receiver<()>) {
+async fn radio_process(
+    id: usize,
+    radio_info: RadioInfo,
+    txs: Vec<TXInfo>,
+    mut rx: UnboundedReceiver<GenlYawmdRXInfo>,
+    mut terminate_rx: broadcast::Receiver<()>,
+) {
     println!("Spawning the {} link.", &id + 1);
     // dbg!(template);
 
     // Prepare netns and ..
-    let result = NetNs::new(netns_name!(&id));
+
     let net_ns: NetNs;
+    let result = NetNs::get(netns_name!(&id));
+
     match result {
         Ok(v) => {
             net_ns = v;
         }
         Err(_) => {
-            println!("Link {} cannot create netns.", &id + 1);
-            return;
+            let result = NetNs::new(netns_name!(&id));
+            match result {
+                Ok(v) => {
+                    net_ns = v;
+                }
+                Err(_) => {
+                    println!("Link {} cannot create netns.", &id + 1);
+                    return;
+                }
+            };
         }
     };
 
@@ -187,29 +247,23 @@ async fn single_pair_process(id: u32, template: Radio, mut terminate_rx: broadca
 
     // Create the simple link which includes 2 radios lied in the same netns.
 
-    let mut radio1: GenlNewRadio = template
+    let new_radio: GenlNewRadio = radio_info
+        .radio
         .clone()
         .try_into()
         .expect("handle radio conversion error");
-    let mut radio2 = radio1.clone();
-
-    radio1.radio_name = radio_name!(id, 1);
-    radio2.radio_name = radio_name!(id, 2);
-    radio1.perm_addr = mac_array!(id as u8, 0x1);
-    radio2.perm_addr = mac_array!(id as u8, 0x2);
 
     let mut hwsim_radios = HwsimRadios::default();
-    hwsim_radios.radios.push(HwsimRadio {
-        addr: radio1.perm_addr.clone(),
-        hw_addr: radio1.perm_addr.clone(),
-    });
-    hwsim_radios.radios.push(HwsimRadio {
-        addr: radio2.perm_addr.clone(),
-        hw_addr: radio2.perm_addr.clone(),
-    });
+    // hwsim_radios.radios.push(HwsimRadio {
+    //     addr: radio1.perm_addr.clone(),
+    //     hw_addr: radio1.perm_addr.clone(),
+    // });
+    // hwsim_radios.radios.push(HwsimRadio {
+    //     addr: radio2.perm_addr.clone(),
+    //     hw_addr: radio2.perm_addr.clone(),
+    // });
 
-    new_radio_nl(&mut handle, radio1).await;
-    new_radio_nl(&mut handle, radio2).await;
+    new_radio_nl(&mut handle, new_radio).await;
 
     loop {
         tokio::select! {
@@ -242,32 +296,60 @@ async fn single_pair_process(id: u32, template: Radio, mut terminate_rx: broadca
                                 rx_info.cookie = data.cookie;
                                 rx_info.freq = data.freq;
                                 rx_info.timestamp = data.timestamp;
+                                rx_info.receiver_info.signal = signal;
 
-                                let mut receiver_info = ReceiverInfo::default();
+                                // println!("1");
 
-                                match hwsim_radios.get_hwaddr_by_addr(&data.frame_header.addr1, &data.frame_header.addr2) {
-                                    Some(v) => {
-                                        receiver_info.addr = v;
-                                    }
-                                    None => {
-                                        continue;
+                                if data.frame_header.addr1.eq(&[255, 255, 255, 255, 255, 255])
+                                    || data.frame_header.addr1.eq(&[0, 0, 0, 0, 0, 0]) {
+                                    txs.iter().for_each(|tx| {
+                                        // if tx.mac.addr.ne(&data.frame_header.addr2) {
+                                            rx_info.receiver_info.addr = tx.mac.hw_addr.clone();
+                                            let result = tx.tx.send(rx_info.clone());
+                                            match result {
+                                                Ok(_) => {
+                                                    // println!("mpsc send success");
+                                                },
+                                                Err(_) => {
+                                                    println!("mpsc send fail");
+                                                },
+                                            }
+                                        // }
+                                    })
+                                } else {
+                                    for tx in &txs {
+                                        if tx.mac.addr.eq(&data.frame_header.addr1) {
+                                            rx_info.receiver_info.addr = tx.mac.hw_addr.clone();
+                                            let result = tx.tx.send(rx_info.clone());
+                                            match result {
+                                                Ok(_) => {},
+                                                Err(_) => {
+                                                    println!("mpsc send fail");
+                                                },
+                                            }
+                                            break;
+                                        }
                                     }
                                 }
-
-                                receiver_info.signal = signal;
-                                rx_info.receiver_info = receiver_info;
-
                                 // println!("{:?}", &rx_info);
 
-                                match handle.notify(rx_info.generate_genl_message()).await {
-                                    Ok(_) => {}
-                                    Err(_) => {}
-                                }
                             }
                             Err(_) => {}
                         }
                     }
                     _ => {}
+                }
+            }
+            Some(msg) = rx.recv() => {
+                println!("{:?}", &msg);
+                match handle.notify(msg.generate_genl_message()).await {
+                    Ok(_) => {
+                        // println!("handle 1 msg");
+
+                    }
+                    Err(_) => {
+                        println!("fail-------------");
+                    }
                 }
             }
             _ = terminate_rx.recv() => {

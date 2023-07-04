@@ -1,0 +1,64 @@
+radios:
+- id: 1
+  channels: 2
+  support_p2p_device: true
+  use_chanctx: false
+  destroy_radio_on_close: true
+  radio_name: "link1_node1"
+  no_vif: false
+  perm_addr:
+  - 0x66
+  - 0x0
+  - 0x0
+  - 0x0
+  - 0x1
+  - 0x0
+- id: 2
+  channels: 2
+  support_p2p_device: true
+  use_chanctx: false
+  destroy_radio_on_close: true
+  radio_name: "link1_node2"
+  no_vif: false
+  perm_addr:
+  - 0x66
+  - 0x0
+  - 0x0
+  - 0x0
+  - 0x1
+  - 0x1
+- id: 3
+  channels: 2
+  support_p2p_device: true
+  use_chanctx: false
+  destroy_radio_on_close: true
+  radio_name: "link2_node1"
+  no_vif: false
+  perm_addr:
+  - 0x66
+  - 0x0
+  - 0x0
+  - 0x0
+  - 0x2
+  - 0x0
+- id: 4
+  channels: 2
+  support_p2p_device: true
+  use_chanctx: false
+  destroy_radio_on_close: true
+  radio_name: "link2_node2"
+  no_vif: false
+  perm_addr:
+  - 0x66
+  - 0x0
+  - 0x0
+  - 0x0
+  - 0x2
+  - 0x1
+links:
+- src: 1
+  dst: 2
+  mutual: true
+- src: 4
+  dst: 3
+  mutual: true

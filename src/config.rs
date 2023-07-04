@@ -8,11 +8,12 @@ use crate::{HwsimRadio, HwsimRadios};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Radio {
+    pub id: usize,
     pub channels: u32,
     pub support_p2p_device: bool,
     pub use_chanctx: bool,
     pub destroy_radio_on_close: bool,
-    // radio_name: String,
+    pub radio_name: String,
     pub no_vif: bool,
     pub perm_addr: [u8; ETH_ALEN],
 }
@@ -29,7 +30,7 @@ impl TryInto<GenlNewRadio> for Radio {
             support_p2p_device: self.support_p2p_device,
             use_chanctx: self.use_chanctx,
             destroy_radio_on_close: self.destroy_radio_on_close,
-            radio_name: "".to_owned(),
+            radio_name: self.radio_name,
             no_vif: self.no_vif,
             perm_addr: self.perm_addr,
             iftype_support: 0,
@@ -38,9 +39,17 @@ impl TryInto<GenlNewRadio> for Radio {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct Link {
+    pub src: usize,
+    pub dst: usize,
+    pub mutual: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default, Clone)]
 pub struct Config {
     pub radios: Vec<Radio>,
+    pub links: Vec<Link>,
 }
 
 impl TryInto<HwsimRadios> for Config {
