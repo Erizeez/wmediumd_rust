@@ -1,1 +1,0 @@
-cmd_/home/parallels/wmediumd_rust/driver/mac80211_hwsim.ko := ld -r -EL  -maarch64elf -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/parallels/wmediumd_rust/driver/mac80211_hwsim.ko /home/parallels/wmediumd_rust/driver/mac80211_hwsim.o /home/parallels/wmediumd_rust/driver/mac80211_hwsim.mod.o;  true
