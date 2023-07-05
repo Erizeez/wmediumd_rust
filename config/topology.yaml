@@ -1,6 +1,6 @@
 radios:
 - id: 1
-  channels: 2
+  channels: 1
   support_p2p_device: true
   use_chanctx: false
   destroy_radio_on_close: true
@@ -14,7 +14,7 @@ radios:
   - 0x1
   - 0x0
 - id: 2
-  channels: 2
+  channels: 1
   support_p2p_device: true
   use_chanctx: false
   destroy_radio_on_close: true
@@ -28,7 +28,7 @@ radios:
   - 0x1
   - 0x1
 - id: 3
-  channels: 2
+  channels: 1
   support_p2p_device: true
   use_chanctx: false
   destroy_radio_on_close: true
@@ -42,7 +42,7 @@ radios:
   - 0x2
   - 0x0
 - id: 4
-  channels: 2
+  channels: 1
   support_p2p_device: true
   use_chanctx: false
   destroy_radio_on_close: true

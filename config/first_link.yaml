@@ -1,5 +1,5 @@
 radios:
-- channels: 2
+- channels: 1
   support_p2p_device: true
   use_chanctx: false
   destroy_radio_on_close: true
@@ -12,7 +12,7 @@ radios:
   - 0x0
   - 0x1
   - 0x0
-- channels: 2
+- channels: 1
   support_p2p_device: true
   use_chanctx: false
   destroy_radio_on_close: true

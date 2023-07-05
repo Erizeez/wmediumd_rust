@@ -3,6 +3,7 @@ use libc::{
     getsockopt, setns, setsockopt, socklen_t, CLONE_NEWNET, CLONE_NEWUSER, CLONE_NEWUTS,
     SOL_SOCKET, SO_BINDTODEVICE,
 };
+use netns_rs::get_from_current_thread;
 use netns_rs::NetNs;
 use std::collections::HashMap;
 use std::env;
@@ -86,7 +87,7 @@ async fn main() {
         .iter()
         .map(|(id, radio_info)| {
             let mut txs: Vec<TXInfo> = vec![];
-            // println!("{}", id);
+
             config.links.iter().for_each(|link| {
                 if link.src == *id {
                     let info = radio_infos.get(&link.dst);
@@ -108,8 +109,8 @@ async fn main() {
                     });
                 }
             });
-
-            // println!("{:?}", txs);
+            println!("{}", id);
+            println!("{:?}", txs);
 
             tokio::spawn(radio_process(
                 *id,
@@ -266,6 +267,9 @@ async fn radio_process(
     new_radio_nl(&mut handle, new_radio).await;
 
     loop {
+        // let ns = get_from_current_thread().unwrap();
+        // println!("{:?}", ns.file().metadata());
+        // println!("{}, {:?}", id, get_from_current_thread().unwrap());
         tokio::select! {
             // _ = tokio::time::sleep(Duration::from_secs(1)) => {
             //     // 执行任务逻辑
@@ -277,9 +281,11 @@ async fn radio_process(
                     netlink_packet_core::NetlinkPayload::InnerMessage(msg) => {
                         let v = GenlMAC::parse_with_param(&msg.payload, msg.header);
                         // dbg!(&v);
+                        // println!("{:?}", &v);
                         match v {
                             Ok(frame) => {
                                 if frame.cmd != HwsimCmd::YawmdTXInfo {
+                                    println!("{:?}", &frame.cmd);
                                     continue;
                                 }
 
@@ -299,6 +305,7 @@ async fn radio_process(
                                 rx_info.receiver_info.signal = signal;
 
                                 // println!("1");
+                                // println!("{} -- {:?}", id, data.frame_header.addr1);
 
                                 if data.frame_header.addr1.eq(&[255, 255, 255, 255, 255, 255])
                                     || data.frame_header.addr1.eq(&[0, 0, 0, 0, 0, 0]) {
@@ -341,7 +348,7 @@ async fn radio_process(
                 }
             }
             Some(msg) = rx.recv() => {
-                println!("{:?}", &msg);
+                // println!("[{:?}]", &msg.cookie);
                 match handle.notify(msg.generate_genl_message()).await {
                     Ok(_) => {
                         // println!("handle 1 msg");

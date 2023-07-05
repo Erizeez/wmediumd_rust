@@ -3812,9 +3812,9 @@ static int hwsim_clone_frame(struct sk_buff *skb_2, const u8 *dst, u32 rate_idx,
 	data2->rx_pkts++;
 	data2->rx_bytes += skb->len;
 
-	printk(KERN_INFO "mac80211_hwsim: rx!.\n");
+	// printk(KERN_INFO "mac80211_hwsim: rx!.\n");
 	ieee80211_rx_irqsafe(data2->hw, skb);
-	printk(KERN_INFO "mac80211_hwsim: send Frame.\n");
+	// printk(KERN_INFO "mac80211_hwsim: send Frame.\n");
 
 	return 0;
 err:
@@ -3870,6 +3870,7 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 	freq = nla_get_u32(info->attrs[HWSIM_ATTR_FREQ]);
 	time_stamp = nla_get_s64(info->attrs[HWSIM_ATTR_FRAME_TIMESTAMP]);
 
+	// printk(KERN_INFO "[%lld] ", ret_skb_cookie);
 	// u8 target[] = {66, 0, 0, 0, 1, 0};
 
 	// if (memcmp(src, target, sizeof(target)))
@@ -3982,6 +3983,7 @@ out:
 static int hwsim_register_received_nl(struct sk_buff *skb_2,
 									  struct genl_info *info)
 {
+	printk(KERN_INFO "mac80211_hwsim: register request coming.\n");
 	struct net *net = genl_info_net(info);
 	struct mac80211_hwsim_data *data;
 	int chans = 1;
@@ -3999,12 +4001,16 @@ static int hwsim_register_received_nl(struct sk_buff *skb_2,
 	if (chans > 1)
 		return -EOPNOTSUPP;
 
+	printk(KERN_INFO "mac80211_hwsim: register EOPNOTSUPP passed.\n");
+
 	if (hwsim_net_get_wmediumd(net))
 		return -EBUSY;
 
+	printk(KERN_INFO "mac80211_hwsim: register EBUSY passed.\n");
+
 	hwsim_register_wmediumd(net, info->snd_portid);
 
-	printk(KERN_INFO "mac80211_hwsim: register.\n");
+	printk(KERN_INFO "mac80211_hwsim: register. -- %lld\n", net->net_cookie);
 
 	pr_debug("mac80211_hwsim: received a REGISTER, "
 			 "switching to wmediumd mode with pid %d\n",
