@@ -121,3 +121,75 @@ Gdk-Message: 16:13:24.860: Error reading events from display: Broken pipe
 (process:248207): GLib-GIO-CRITICAL **: 09:55:27.839: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
 
 (process:248208): GLib-GIO-CRITICAL **: 09:55:27.839: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:4536): GLib-GIO-CRITICAL **: 10:22:05.459: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:4539): GLib-GIO-CRITICAL **: 10:22:05.460: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:4538): GLib-GIO-CRITICAL **: 10:22:05.458: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:4537): GLib-GIO-CRITICAL **: 10:22:05.462: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:4448): GLib-GIO-CRITICAL **: 10:27:43.077: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:4447): GLib-GIO-CRITICAL **: 10:27:43.077: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:4539): GLib-GIO-CRITICAL **: 10:27:49.218: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:4540): GLib-GIO-CRITICAL **: 10:27:49.219: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:5977): GLib-GIO-CRITICAL **: 10:30:52.416: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:5976): GLib-GIO-CRITICAL **: 10:30:52.416: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:5978): GLib-GIO-CRITICAL **: 10:30:52.417: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:5975): GLib-GIO-CRITICAL **: 10:30:52.417: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:7111): GLib-GIO-CRITICAL **: 10:32:16.331: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:7109): GLib-GIO-CRITICAL **: 10:32:16.332: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:7108): GLib-GIO-CRITICAL **: 10:32:16.335: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:7110): GLib-GIO-CRITICAL **: 10:32:16.335: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:8022): GLib-GIO-CRITICAL **: 10:33:12.245: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:10738): GLib-GIO-CRITICAL **: 10:36:50.142: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:10740): GLib-GIO-CRITICAL **: 10:36:50.146: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:10739): GLib-GIO-CRITICAL **: 10:36:50.146: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:10741): GLib-GIO-CRITICAL **: 10:36:50.148: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:10744): GLib-GIO-CRITICAL **: 10:36:50.148: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:10743): GLib-GIO-CRITICAL **: 10:36:50.150: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:10745): GLib-GIO-CRITICAL **: 10:36:50.155: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:10742): GLib-GIO-CRITICAL **: 10:36:50.154: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:5044): GLib-GIO-CRITICAL **: 10:37:06.052: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:5042): GLib-GIO-CRITICAL **: 10:37:06.053: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:5041): GLib-GIO-CRITICAL **: 10:37:06.053: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:5043): GLib-GIO-CRITICAL **: 10:37:06.056: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:9235): GLib-GIO-CRITICAL **: 14:00:05.327: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:9232): GLib-GIO-CRITICAL **: 14:00:05.328: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:9234): GLib-GIO-CRITICAL **: 14:00:05.337: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:6229): GLib-GIO-CRITICAL **: 14:29:14.098: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:6228): GLib-GIO-CRITICAL **: 14:29:14.103: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:6227): GLib-GIO-CRITICAL **: 14:29:14.138: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:6226): GLib-GIO-CRITICAL **: 14:29:14.148: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
