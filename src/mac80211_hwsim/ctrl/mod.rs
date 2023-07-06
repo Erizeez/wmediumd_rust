@@ -21,8 +21,6 @@ pub enum HwsimCmd {
     GetRadio,
     AddMACAddr,
     DelMACAddr,
-    YawmdTXInfo,
-    YawmdRXInfo,
 }
 
 impl From<HwsimCmd> for u8 {
@@ -37,8 +35,6 @@ impl From<HwsimCmd> for u8 {
             GetRadio => HWSIM_CMD_GET_RADIO,
             AddMACAddr => HWSIM_CMD_ADD_MAC_ADDR,
             DelMACAddr => HWSIM_CMD_DEL_MAC_ADDR,
-            YawmdTXInfo => HWSIM_YAWMD_TX_INFO,
-            YawmdRXInfo => HWSIM_YAWMD_RX_INFO,
         }
     }
 }
@@ -57,8 +53,6 @@ impl TryFrom<u8> for HwsimCmd {
             HWSIM_CMD_GET_RADIO => GetRadio,
             HWSIM_CMD_ADD_MAC_ADDR => AddMACAddr,
             HWSIM_CMD_DEL_MAC_ADDR => DelMACAddr,
-            HWSIM_YAWMD_TX_INFO => YawmdTXInfo,
-            HWSIM_YAWMD_RX_INFO => YawmdRXInfo,
             cmd => return Err(DecodeError::from(format!("Unknown control command: {cmd}"))),
         })
     }

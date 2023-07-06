@@ -1,7 +1,7 @@
-use crate::mac80211_hwsim::constants::*;
 use crate::mac80211_hwsim::ctrl::nlas::HwsimAttrs;
 use crate::mac80211_hwsim::ctrl::{GenlAutoConstruct, GenlMAC, HwsimCmd};
-use crate::mac80211_hwsim::structs::{IEEE80211Header, ReceiverInfo, TXInfo, TXInfoFlag};
+use crate::mac80211_hwsim::structs::{Frame, IEEE80211Header, ReceiverInfo, TXInfo, TXInfoFlag};
+use crate::mac80211_hwsim::{constants::*, MACAddress};
 use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NLM_F_DUMP, NLM_F_REQUEST};
 use netlink_packet_generic::GenlMessage;
 
@@ -28,30 +28,31 @@ impl GenlAutoConstruct for GenlRegister {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct GenlYawmdTXInfo {
-    pub addr_transmitter: [u8; ETH_ALEN],
+pub struct GenlFrameTX {
+    pub addr_transmitter: MACAddress,
+    pub frame: Frame,
     pub flags: u32,
     pub tx_info: [TXInfo; IEEE80211_TX_MAX_RATES],
     pub cookie: u64,
     pub freq: u32,
     pub tx_info_flags: [TXInfoFlag; IEEE80211_TX_MAX_RATES],
-    pub frame_header: IEEE80211Header,
-    pub frame_length: u32,
-    pub timestamp: i64,
 }
 
-impl GenlAutoConstruct for GenlYawmdTXInfo {
+impl GenlAutoConstruct for GenlFrameTX {
     fn generate_genl_message(&self) -> NetlinkMessage<GenlMessage<GenlMAC>> {
         panic!("generate_genl_message function not implemented for GenlRegister");
     }
 
     fn parse(data: GenlMAC) -> Self {
-        let mut parsed_data = GenlYawmdTXInfo::default();
+        let mut parsed_data = GenlFrameTX::default();
         for attr in &data.nlas {
             use HwsimAttrs::*;
             match attr {
                 AddrTransmitter(v) => {
                     parsed_data.addr_transmitter = *v;
+                }
+                Frame(v) => {
+                    parsed_data.frame = v.clone();
                 }
                 Flags(v) => {
                     parsed_data.flags = *v;
@@ -68,15 +69,6 @@ impl GenlAutoConstruct for GenlYawmdTXInfo {
                 TXInfoFlags(v) => {
                     parsed_data.tx_info_flags = *v;
                 }
-                FrameHeader(v) => {
-                    parsed_data.frame_header = (*v).clone();
-                }
-                FrameLength(v) => {
-                    parsed_data.frame_length = *v;
-                }
-                TimeStamp(v) => {
-                    parsed_data.timestamp = *v;
-                }
                 _ => {}
             }
         }
@@ -85,19 +77,54 @@ impl GenlAutoConstruct for GenlYawmdTXInfo {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct GenlYawmdRXInfo {
-    pub addr_transmitter: [u8; ETH_ALEN],
-    pub flags: u32,
+pub struct GenlFrameRX {
+    pub addr_receiver: MACAddress,
+    pub frame: Frame,
     pub rx_rate: u32,
     pub signal: u32,
-    pub tx_info: [TXInfo; IEEE80211_TX_MAX_RATES],
-    pub cookie: u64,
     pub freq: u32,
-    pub timestamp: i64,
-    pub receiver_info: ReceiverInfo,
 }
 
-impl GenlAutoConstruct for GenlYawmdRXInfo {
+impl GenlAutoConstruct for GenlFrameRX {
+    fn generate_genl_message(&self) -> NetlinkMessage<GenlMessage<GenlMAC>> {
+        let mut nl_hdr = NetlinkHeader::default();
+        nl_hdr.flags = NLM_F_REQUEST;
+
+        let mut nlas = vec![];
+
+        use HwsimAttrs::*;
+
+        nlas.push(AddrReceiver(self.addr_receiver));
+        nlas.push(Frame(self.frame.clone()));
+        nlas.push(RXRate(self.rx_rate));
+        nlas.push(Signal(self.signal));
+        nlas.push(Freq(self.freq));
+
+        NetlinkMessage::new(
+            nl_hdr,
+            GenlMessage::from_payload(GenlMAC {
+                cmd: HwsimCmd::Frame,
+                nlas,
+            })
+            .into(),
+        )
+    }
+
+    fn parse(data: GenlMAC) -> Self {
+        panic!("parse function not implemented for GenlYawmdRXInfo");
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct GenlTXInfoFrame {
+    pub addr_transmitter: MACAddress,
+    pub flags: u32,
+    pub cookie: u64,
+    pub signal: u32,
+    pub tx_info: [TXInfo; IEEE80211_TX_MAX_RATES],
+}
+
+impl GenlAutoConstruct for GenlTXInfoFrame {
     fn generate_genl_message(&self) -> NetlinkMessage<GenlMessage<GenlMAC>> {
         let mut nl_hdr = NetlinkHeader::default();
         nl_hdr.flags = NLM_F_REQUEST;
@@ -107,19 +134,15 @@ impl GenlAutoConstruct for GenlYawmdRXInfo {
         use HwsimAttrs::*;
 
         nlas.push(AddrTransmitter(self.addr_transmitter));
-        nlas.push(Flags(self.signal));
-        nlas.push(RXRate(self.rx_rate));
+        nlas.push(Flags(self.flags));
+        nlas.push(Cookie(self.cookie));
         nlas.push(Signal(self.signal));
         nlas.push(TXInfo(self.tx_info));
-        nlas.push(Cookie(self.cookie));
-        nlas.push(Freq(self.freq));
-        nlas.push(TimeStamp(self.timestamp));
-        nlas.push(ReceiverInfo(self.receiver_info.clone()));
 
         NetlinkMessage::new(
             nl_hdr,
             GenlMessage::from_payload(GenlMAC {
-                cmd: HwsimCmd::YawmdRXInfo,
+                cmd: HwsimCmd::TXInfoFrame,
                 nlas,
             })
             .into(),

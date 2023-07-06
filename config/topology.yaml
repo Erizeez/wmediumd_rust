@@ -1,5 +1,6 @@
 radios:
 - id: 1
+  node_id: 1
   channels: 1
   support_p2p_device: true
   use_chanctx: false
@@ -14,6 +15,7 @@ radios:
   - 0x1
   - 0x0
 - id: 2
+  node_id: 2
   channels: 1
   support_p2p_device: true
   use_chanctx: false
@@ -28,6 +30,7 @@ radios:
   - 0x1
   - 0x1
 - id: 3
+  node_id: 1
   channels: 1
   support_p2p_device: true
   use_chanctx: false
@@ -42,6 +45,7 @@ radios:
   - 0x2
   - 0x0
 - id: 4
+  node_id: 2
   channels: 1
   support_p2p_device: true
   use_chanctx: false
@@ -56,6 +60,7 @@ radios:
   - 0x2
   - 0x1
 - id: 5
+  node_id: 1
   channels: 1
   support_p2p_device: true
   use_chanctx: false
@@ -70,6 +75,7 @@ radios:
   - 0x3
   - 0x0
 - id: 6
+  node_id: 2
   channels: 1
   support_p2p_device: true
   use_chanctx: false
@@ -84,6 +90,7 @@ radios:
   - 0x3
   - 0x1
 - id: 7
+  node_id: 1
   channels: 1
   support_p2p_device: true
   use_chanctx: false
@@ -98,6 +105,7 @@ radios:
   - 0x4
   - 0x0
 - id: 8
+  node_id: 2
   channels: 1
   support_p2p_device: true
   use_chanctx: false

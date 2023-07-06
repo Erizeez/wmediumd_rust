@@ -3,13 +3,16 @@ use libc::{
     getsockopt, setns, setsockopt, socklen_t, CLONE_NEWNET, CLONE_NEWUSER, CLONE_NEWUTS,
     SOL_SOCKET, SO_BINDTODEVICE,
 };
+use mac80211_hwsim::MACAddress;
 use netns_rs::get_from_current_thread;
 use netns_rs::NetNs;
 use std::collections::HashMap;
 use std::env;
+use std::io;
 use std::os::fd::AsRawFd;
 use std::time::Duration;
 use std::{ffi::CString, os::fd::RawFd};
+use structs::GenlFrameRX;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -27,13 +30,15 @@ use netlink_sys::{
     Socket, SocketAddr,
 };
 
+use crate::structs::GenlFrameTX;
+use crate::structs::GenlTXInfoFrame;
 use crate::{
     config::{load_config, Config},
     mac80211_hwsim::{
         constants::MICROSECONDS_TO_NANOSECONDS, ctrl::nlas::HwsimAttrs, new_radio_nl,
         structs::ReceiverInfo,
     },
-    structs::{GenlNewRadio, GenlRadioOps, GenlRegister, GenlYawmdRXInfo, GenlYawmdTXInfo},
+    structs::{GenlNewRadio, GenlRadioOps, GenlRegister},
 };
 
 use self::mac80211_hwsim::ctrl::*;
@@ -42,21 +47,37 @@ mod config;
 mod mac80211_hwsim;
 mod structs;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct RadioInfo {
     radio: Radio,
-    tx: UnboundedSender<GenlYawmdRXInfo>,
+    tx: UnboundedSender<GenlFrameTX>,
 }
 
 #[derive(Clone, Debug)]
 struct TXInfo {
-    tx: UnboundedSender<GenlYawmdRXInfo>,
+    tx: UnboundedSender<GenlFrameTX>,
     mac: HwsimRadio,
 }
 
 #[tokio::main]
 async fn main() {
-    // tokio::spawn(init_genetlink("./config/first_link.yaml", "ns0"));
+    // 获取命令行参数
+    let args: Vec<String> = env::args().collect();
+
+    // 检查参数数量
+    if args.len() < 2 {
+        println!("请提供一个整数作为参数");
+        return;
+    }
+
+    // 解析参数为整数
+    let node_id: i32 = match args[1].parse() {
+        Ok(n) => n,
+        Err(_) => {
+            println!("参数不是有效的整数");
+            return;
+        }
+    };
 
     let config_path = "./config/topology.yaml";
     let config = load_config(config_path);
@@ -67,10 +88,10 @@ async fn main() {
 
     let mut radio_infos: HashMap<usize, RadioInfo> = HashMap::new();
 
-    let mut rxs: HashMap<usize, UnboundedReceiver<GenlYawmdRXInfo>> = HashMap::new();
+    let mut rxs: HashMap<usize, UnboundedReceiver<GenlFrameTX>> = HashMap::new();
 
     for i in 0..num {
-        let (tx, rx) = mpsc::unbounded_channel::<GenlYawmdRXInfo>();
+        let (tx, rx) = mpsc::unbounded_channel::<GenlFrameTX>();
         rxs.insert(config.radios[i].id, rx);
         radio_infos.insert(
             config.radios[i].id,
@@ -92,7 +113,7 @@ async fn main() {
                 if link.src == *id {
                     let info = radio_infos.get(&link.dst);
                     txs.push(TXInfo {
-                        tx: radio_info.tx.clone(),
+                        tx: info.unwrap().tx.clone(),
                         mac: HwsimRadio {
                             addr: info.unwrap().radio.perm_addr.clone(),
                             hw_addr: info.unwrap().radio.perm_addr.clone(),
@@ -101,7 +122,7 @@ async fn main() {
                 } else if link.dst == *id && link.mutual {
                     let info = radio_infos.get(&link.src);
                     txs.push(TXInfo {
-                        tx: radio_info.tx.clone(),
+                        tx: info.unwrap().tx.clone(),
                         mac: HwsimRadio {
                             addr: info.unwrap().radio.perm_addr.clone(),
                             hw_addr: info.unwrap().radio.perm_addr.clone(),
@@ -110,11 +131,12 @@ async fn main() {
                 }
             });
             println!("{}", id);
-            println!("{:?}", txs);
+            println!("{:?}", &txs);
+            println!("{:?}", &radio_info);
 
             tokio::spawn(radio_process(
                 *id,
-                (*radio_info).clone(),
+                radio_info.clone(),
                 txs,
                 rxs.remove(id).unwrap(),
                 terminate_rx.resubscribe(),
@@ -142,8 +164,6 @@ async fn main() {
     println!("Exiting...");
 }
 
-type MACAddress = [u8; ETH_ALEN];
-
 #[derive(Clone, Debug)]
 pub struct HwsimRadio {
     addr: MACAddress,
@@ -153,24 +173,6 @@ pub struct HwsimRadio {
 #[derive(Default)]
 pub struct HwsimRadios {
     radios: Vec<HwsimRadio>,
-}
-
-impl HwsimRadios {
-    fn get_hwaddr_by_addr(&self, dst: &MACAddress, src: &MACAddress) -> Option<MACAddress> {
-        if dst.eq(&[255, 255, 255, 255, 255, 255]) {
-            for radio in &self.radios {
-                if radio.addr.ne(src) {
-                    return Some(radio.hw_addr.clone());
-                }
-            }
-        }
-        for radio in &self.radios {
-            if radio.addr.eq(dst) {
-                return Some(radio.hw_addr.clone());
-            }
-        }
-        None
-    }
 }
 
 macro_rules! netns_name {
@@ -198,7 +200,7 @@ async fn radio_process(
     id: usize,
     radio_info: RadioInfo,
     txs: Vec<TXInfo>,
-    mut rx: UnboundedReceiver<GenlYawmdRXInfo>,
+    mut rx: UnboundedReceiver<GenlFrameTX>,
     mut terminate_rx: broadcast::Receiver<()>,
 ) {
     println!("Spawning the {} link.", &id);
@@ -254,16 +256,6 @@ async fn radio_process(
         .try_into()
         .expect("handle radio conversion error");
 
-    let mut hwsim_radios = HwsimRadios::default();
-    // hwsim_radios.radios.push(HwsimRadio {
-    //     addr: radio1.perm_addr.clone(),
-    //     hw_addr: radio1.perm_addr.clone(),
-    // });
-    // hwsim_radios.radios.push(HwsimRadio {
-    //     addr: radio2.perm_addr.clone(),
-    //     hw_addr: radio2.perm_addr.clone(),
-    // });
-
     new_radio_nl(&mut handle, new_radio).await;
 
     loop {
@@ -284,50 +276,32 @@ async fn radio_process(
                         // println!("{:?}", &v);
                         match v {
                             Ok(frame) => {
-                                if frame.cmd != HwsimCmd::YawmdTXInfo {
-                                    println!("{:?}", &frame.cmd);
+                                if frame.cmd != HwsimCmd::Frame {
+                                    // println!("{:?}", &frame.cmd);
                                     continue;
                                 }
 
-                                let signal = (30 - 91) as u32;
+                                let data = parse_genl_message::<GenlFrameTX>(frame);
 
-                                let data = parse_genl_message::<GenlYawmdTXInfo>(frame);
-
-                                let mut rx_info = GenlYawmdRXInfo::default();
-                                rx_info.addr_transmitter = data.addr_transmitter;
-                                rx_info.flags = data.flags;
-                                rx_info.rx_rate = data.tx_info[0].idx as u32;
-                                rx_info.signal = signal;
-                                rx_info.tx_info = data.tx_info;
-                                rx_info.cookie = data.cookie;
-                                rx_info.freq = data.freq;
-                                rx_info.timestamp = data.timestamp;
-                                rx_info.receiver_info.signal = signal;
-
-                                // println!("1");
-                                // println!("{} -- {:?}", id, data.frame_header.addr1);
-
-                                if data.frame_header.addr1.eq(&[255, 255, 255, 255, 255, 255])
-                                    || data.frame_header.addr1.eq(&[0, 0, 0, 0, 0, 0]) {
+                                if data.frame.header.addr1.eq(&[255, 255, 255, 255, 255, 255])
+                                    || data.frame.header.addr1.eq(&[0, 0, 0, 0, 0, 0]) {
                                     txs.iter().for_each(|tx| {
-                                        // if tx.mac.addr.ne(&data.frame_header.addr2) {
-                                            rx_info.receiver_info.addr = tx.mac.hw_addr.clone();
-                                            let result = tx.tx.send(rx_info.clone());
-                                            match result {
-                                                Ok(_) => {
-                                                    // println!("mpsc send success");
-                                                },
-                                                Err(_) => {
-                                                    println!("mpsc send fail");
-                                                },
-                                            }
-                                        // }
+
+                                        let result = tx.tx.send(data.clone());
+                                        match result {
+                                            Ok(_) => {
+                                                // println!("mpsc send success");
+                                            },
+                                            Err(_) => {
+                                                println!("mpsc send fail");
+                                            },
+                                        }
                                     })
                                 } else {
                                     for tx in &txs {
-                                        if tx.mac.addr.eq(&data.frame_header.addr1) {
-                                            rx_info.receiver_info.addr = tx.mac.hw_addr.clone();
-                                            let result = tx.tx.send(rx_info.clone());
+                                        if tx.mac.addr.eq(&data.frame.header.addr1) {
+                                            assert!(&tx.mac.hw_addr.ne(&radio_info.radio.perm_addr));
+                                            let result = tx.tx.send(data.clone());
                                             match result {
                                                 Ok(_) => {},
                                                 Err(_) => {
@@ -338,6 +312,10 @@ async fn radio_process(
                                         }
                                     }
                                 }
+                                // println!("1");
+                                // println!("{} -- {:?}", id, data.frame_header.addr1);
+
+
                                 // println!("{:?}", &rx_info);
 
                             }
@@ -348,14 +326,44 @@ async fn radio_process(
                 }
             }
             Some(msg) = rx.recv() => {
-                // println!("[{:?}]", &msg.cookie);
-                match handle.notify(msg.generate_genl_message()).await {
+
+                let signal = (30 - 91) as u32;
+
+                let mut frame_rx = GenlFrameRX::default();
+                let mut tx_info_frame = GenlTXInfoFrame::default();
+                tx_info_frame.addr_transmitter = msg.addr_transmitter;
+                tx_info_frame.flags = msg.flags;
+                frame_rx.rx_rate = msg.tx_info[0].idx as u32;
+                frame_rx.signal = signal;
+                tx_info_frame.tx_info = msg.tx_info;
+                tx_info_frame.cookie = msg.cookie;
+                frame_rx.freq = msg.freq;
+                frame_rx.frame = msg.frame;
+                frame_rx.addr_receiver = radio_info.radio.perm_addr.clone();
+
+
+                // println!("{:?}", &frame_rx.addr_receiver);
+                // println!("{:?}", &tx_info_frame.addr_transmitter);
+                // assert!(&frame_rx.addr_receiver.ne(&tx_info_frame.addr_transmitter));
+
+
+                match handle.notify(frame_rx.generate_genl_message()).await {
                     Ok(_) => {
-                        // println!("handle 1 msg");
+                        // println!("handle 1 frame rx");
 
                     }
                     Err(_) => {
-                        println!("fail-------------");
+                        println!("fail frame rx");
+                    }
+                }
+
+                match handle.notify(tx_info_frame.generate_genl_message()).await {
+                    Ok(_) => {
+                        // println!("handle 1 frame tx info");
+
+                    }
+                    Err(_) => {
+                        println!("fail frame tx info");
                     }
                 }
             }
@@ -375,219 +383,3 @@ async fn radio_process(
         }
     }
 }
-
-async fn init_genetlink(config_path: &str, net_ns: &str) -> Result<(), Error> {
-    println!("Start Genetlink");
-
-    // let config: Config = load_config(config_path);
-
-    let genl_register = GenlRegister {};
-
-    let (conn, mut handle, mut receiver) = new_connection()?;
-
-    tokio::spawn(conn);
-
-    handle.notify(genl_register.generate_genl_message()).await?;
-
-    // let ops = GenlRadioOps { idx: 1 };
-    // match handle.request(ops.generate_genl_get()).await {
-    //     Ok(mut stream) => {
-    //         while let Some(msg) = stream.next().await {
-    //             match msg {
-    //                 Ok(v) => match v.payload {
-    //                     NetlinkPayload::InnerMessage(v) => {
-    //                         println!("{:?}", v.payload);
-    //                     }
-    //                     _ => {
-    //                         println!("error");
-    //                     }
-    //                 },
-    //                 Err(v) => {
-    //                     println!("{:?}", v);
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     Err(v) => {
-    //         println!("{:?}", v);
-    //     }
-    // };
-
-    // for radio in &config.radios {
-    //     new_radio_nl(&mut handle, &radio).await;
-    // }
-    let mut hwsim_radios: HwsimRadios = HwsimRadios::default();
-
-    // config
-    //     .try_into()
-    //     .expect("handle hwsim_radio conversion error");
-
-    hwsim_radios.radios.push(HwsimRadio {
-        addr: [0x2, 0x0, 0x0, 0x0, 0x0, 0x0],
-        hw_addr: [0x42, 0x0, 0x0, 0x0, 0x0, 0x0],
-    });
-
-    hwsim_radios.radios.push(HwsimRadio {
-        addr: [0x2, 0x0, 0x0, 0x0, 0x1, 0x0],
-        hw_addr: [0x42, 0x0, 0x0, 0x0, 0x1, 0x0],
-    });
-
-    // let ops = GenlRadioOps::default();
-    // match handle.request(ops.generate_genl_dump()).await {
-    //     Ok(mut stream) => {
-    //         while let Some(msg) = stream.next().await {
-    //             match msg {
-    //                 Ok(v) => match v.payload {
-    //                     NetlinkPayload::InnerMessage(v) => {
-    //                         println!("{:?}", v.payload);
-    //                     }
-    //                     _ => {
-    //                         println!("error");
-    //                     }
-    //                 },
-    //                 Err(v) => {
-    //                     println!("{:?}", v);
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     Err(v) => {
-    //         println!("{:?}", v);
-    //     }
-    // };
-    // return Ok(());
-
-    while let Some(msg) = receiver.next().await {
-        let msg = msg.0;
-        match msg.payload {
-            netlink_packet_core::NetlinkPayload::InnerMessage(msg) => {
-                let v = GenlMAC::parse_with_param(&msg.payload, msg.header);
-                // dbg!(&v);
-                match v {
-                    Ok(frame) => {
-                        if frame.cmd != HwsimCmd::YawmdTXInfo {
-                            // println!("{:?}-- {:?} ", frame.cmd, frame.nlas);
-                            continue;
-                        }
-
-                        let signal = (30 - 91) as u32;
-
-                        let data = parse_genl_message::<GenlYawmdTXInfo>(frame);
-
-                        let mut rx_info = GenlYawmdRXInfo::default();
-                        rx_info.addr_transmitter = data.addr_transmitter;
-                        rx_info.flags = data.flags;
-                        rx_info.rx_rate = data.tx_info[0].idx as u32;
-                        rx_info.signal = signal;
-                        rx_info.tx_info = data.tx_info;
-                        rx_info.cookie = data.cookie;
-                        rx_info.freq = data.freq;
-                        rx_info.timestamp = data.timestamp;
-
-                        let mut receiver_info = ReceiverInfo::default();
-                        // if data.addr_transmitter.eq(&[0x42, 0x0, 0x0, 0x0, 0x1, 0x0]) {
-                        //     receiver_info.addr = [0x42, 0x0, 0x0, 0x0, 0x0, 0x0];
-                        // } else {
-                        //     receiver_info.addr = [0x42, 0x0, 0x0, 0x0, 0x1, 0x0];
-                        // }
-
-                        match &hwsim_radios
-                            .get_hwaddr_by_addr(&data.frame_header.addr1, &data.frame_header.addr2)
-                        {
-                            Some(v) => {
-                                receiver_info.addr = v.clone();
-                            }
-                            None => {}
-                        }
-
-                        receiver_info.signal = signal;
-                        rx_info.receiver_info = receiver_info;
-
-                        // println!("{:?}", &rx_info);
-
-                        match handle.notify(rx_info.generate_genl_message()).await {
-                            Ok(_) => {}
-                            Err(_) => {}
-                        }
-                    }
-                    Err(_) => {}
-                }
-            }
-            _ => {}
-        }
-    }
-    // #[for_await]
-    // for msg in receiver {
-    //     let msg = msg?;
-    //     println!("{}",)
-    // }
-    // receiver
-
-    // loop {
-    //     match receiver.try_next() {
-    //         Ok(msg) => {
-    //             if let Some(msg) = msg {
-    //                 let msg: = msg.try_into()
-    //                 println!("recv msg")
-    //             }
-    //         }
-    //         Err(_) => {}
-    //     }
-    // }
-
-    // let _ = sleep(Duration::from_secs(1)).await;
-
-    Ok(())
-}
-
-// fn print_entry(entry: Vec<GenlCtrlAttrs>) {
-//     let family_id = entry
-//         .iter()
-//         .find_map(|nla| {
-//             if let GenlCtrlAttrs::FamilyId(id) = nla {
-//                 Some(*id)
-//             } else {
-//                 None
-//             }
-//         })
-//         .expect("Cannot find FamilyId attribute");
-//     let family_name = entry
-//         .iter()
-//         .find_map(|nla| {
-//             if let GenlCtrlAttrs::FamilyName(name) = nla {
-//                 Some(name.as_str())
-//             } else {
-//                 None
-//             }
-//         })
-//         .expect("Cannot find FamilyName attribute");
-//     let version = entry
-//         .iter()
-//         .find_map(|nla| {
-//             if let GenlCtrlAttrs::Version(ver) = nla {
-//                 Some(*ver)
-//             } else {
-//                 None
-//             }
-//         })
-//         .expect("Cannot find Version attribute");
-//     let hdrsize = entry
-//         .iter()
-//         .find_map(|nla| {
-//             if let GenlCtrlAttrs::HdrSize(hdr) = nla {
-//                 Some(*hdr)
-//             } else {
-//                 None
-//             }
-//         })
-//         .expect("Cannot find HdrSize attribute");
-
-//     if hdrsize == 0 {
-//         println!("0x{family_id:04x} {family_name} [Version {version}]");
-//     } else {
-//         println!(
-//             "0x{family_id:04x} {family_name} [Version {version}] \
-//             [Header {hdrsize} bytes]"
-//         );
-//     }
-// }

@@ -20,10 +20,11 @@
  * @HWSIM_TX_STAT_ACK: Frame was acknowledged
  *
  */
-enum hwsim_tx_control_flags {
-	HWSIM_TX_CTL_REQ_TX_STATUS		= BIT(0),
-	HWSIM_TX_CTL_NO_ACK			= BIT(1),
-	HWSIM_TX_STAT_ACK			= BIT(2),
+enum hwsim_tx_control_flags
+{
+	HWSIM_TX_CTL_REQ_TX_STATUS = BIT(0),
+	HWSIM_TX_CTL_NO_ACK = BIT(1),
+	HWSIM_TX_STAT_ACK = BIT(2),
 };
 
 /**
@@ -81,9 +82,14 @@ enum hwsim_tx_control_flags {
  *	to this receiver address for a given station.
  * @HWSIM_CMD_DEL_MAC_ADDR: remove the MAC address again, the attributes
  *	are the same as to @HWSIM_CMD_ADD_MAC_ADDR.
+ * @HWSIM_YAWMD_TX_INFO: message sent to yawmd, with information to perform the
+ * 	simulation
+ * @HWSIM_YAWMD_RX_INFO: message received from yawmd, with the results of the
+ * 	simulation
  * @__HWSIM_CMD_MAX: enum limit
  */
-enum {
+enum
+{
 	HWSIM_CMD_UNSPEC,
 	HWSIM_CMD_REGISTER,
 	HWSIM_CMD_FRAME,
@@ -93,12 +99,14 @@ enum {
 	HWSIM_CMD_GET_RADIO,
 	HWSIM_CMD_ADD_MAC_ADDR,
 	HWSIM_CMD_DEL_MAC_ADDR,
+	HWSIM_YAWMD_TX_INFO,
+	HWSIM_YAWMD_RX_INFO,
 	__HWSIM_CMD_MAX,
 };
 #define HWSIM_CMD_MAX (_HWSIM_CMD_MAX - 1)
 
-#define HWSIM_CMD_CREATE_RADIO   HWSIM_CMD_NEW_RADIO
-#define HWSIM_CMD_DESTROY_RADIO  HWSIM_CMD_DEL_RADIO
+#define HWSIM_CMD_CREATE_RADIO HWSIM_CMD_NEW_RADIO
+#define HWSIM_CMD_DESTROY_RADIO HWSIM_CMD_DEL_RADIO
 
 /**
  * enum hwsim_attrs - hwsim netlink attributes
@@ -140,11 +148,15 @@ enum {
  * @HWSIM_ATTR_PERM_ADDR: permanent mac address of new radio
  * @HWSIM_ATTR_IFTYPE_SUPPORT: u32 attribute of supported interface types bits
  * @HWSIM_ATTR_CIPHER_SUPPORT: u32 array of supported cipher types
+ * @HWSIM_ATTR_FRAME_HEADER: frame header, used by yawmd
+ * @HWSIM_ATTR_FRAME_LENGTH: frame length in bytes, used by yawmd
+ * @HWSIM_ATTR_FRAME_ID: u64 unique identifier of a frame, used with yawmd
+ * @HWSIM_ATTR_RECEIVER_INFO: array of struct itf_recv_info/hwsim_itf_recv_info
  * @__HWSIM_ATTR_MAX: enum limit
  */
 
-
-enum {
+enum
+{
 	HWSIM_ATTR_UNSPEC,
 	HWSIM_ATTR_ADDR_RECEIVER,
 	HWSIM_ATTR_ADDR_TRANSMITTER,
@@ -170,6 +182,11 @@ enum {
 	HWSIM_ATTR_PERM_ADDR,
 	HWSIM_ATTR_IFTYPE_SUPPORT,
 	HWSIM_ATTR_CIPHER_SUPPORT,
+	HWSIM_ATTR_FRAME_HEADER,
+	HWSIM_ATTR_FRAME_LENGTH,
+	HWSIM_ATTR_FRAME_ID,
+	HWSIM_ATTR_RECEIVER_INFO,
+	HWSIM_ATTR_FRAME_TIMESTAMP,
 	__HWSIM_ATTR_MAX,
 };
 #define HWSIM_ATTR_MAX (__HWSIM_ATTR_MAX - 1)
@@ -187,7 +204,8 @@ enum {
  * always report the rate and number of retries used.
  *
  */
-struct hwsim_tx_rate {
+struct hwsim_tx_rate
+{
 	s8 idx;
 	u8 count;
 } __packed;
@@ -221,20 +239,21 @@ struct hwsim_tx_rate {
  * @MAC80211_HWSIM_TX_RC_SHORT_GI: Short Guard interval should be used for this
  *	rate.
  */
-enum hwsim_tx_rate_flags {
-	MAC80211_HWSIM_TX_RC_USE_RTS_CTS		= BIT(0),
-	MAC80211_HWSIM_TX_RC_USE_CTS_PROTECT		= BIT(1),
-	MAC80211_HWSIM_TX_RC_USE_SHORT_PREAMBLE	= BIT(2),
+enum hwsim_tx_rate_flags
+{
+	MAC80211_HWSIM_TX_RC_USE_RTS_CTS = BIT(0),
+	MAC80211_HWSIM_TX_RC_USE_CTS_PROTECT = BIT(1),
+	MAC80211_HWSIM_TX_RC_USE_SHORT_PREAMBLE = BIT(2),
 
 	/* rate index is an HT/VHT MCS instead of an index */
-	MAC80211_HWSIM_TX_RC_MCS			= BIT(3),
-	MAC80211_HWSIM_TX_RC_GREEN_FIELD		= BIT(4),
-	MAC80211_HWSIM_TX_RC_40_MHZ_WIDTH		= BIT(5),
-	MAC80211_HWSIM_TX_RC_DUP_DATA		= BIT(6),
-	MAC80211_HWSIM_TX_RC_SHORT_GI		= BIT(7),
-	MAC80211_HWSIM_TX_RC_VHT_MCS			= BIT(8),
-	MAC80211_HWSIM_TX_RC_80_MHZ_WIDTH		= BIT(9),
-	MAC80211_HWSIM_TX_RC_160_MHZ_WIDTH		= BIT(10),
+	MAC80211_HWSIM_TX_RC_MCS = BIT(3),
+	MAC80211_HWSIM_TX_RC_GREEN_FIELD = BIT(4),
+	MAC80211_HWSIM_TX_RC_40_MHZ_WIDTH = BIT(5),
+	MAC80211_HWSIM_TX_RC_DUP_DATA = BIT(6),
+	MAC80211_HWSIM_TX_RC_SHORT_GI = BIT(7),
+	MAC80211_HWSIM_TX_RC_VHT_MCS = BIT(8),
+	MAC80211_HWSIM_TX_RC_80_MHZ_WIDTH = BIT(9),
+	MAC80211_HWSIM_TX_RC_160_MHZ_WIDTH = BIT(10),
 };
 
 /**
@@ -250,10 +269,24 @@ enum hwsim_tx_rate_flags {
  * always report the rate and number of retries used.
  *
  */
-struct hwsim_tx_rate_flag {
+struct hwsim_tx_rate_flag
+{
 	s8 idx;
 	u16 flags;
 } __packed;
+
+/**
+ * struct hwsim_itf_recv_info
+ *
+ * Used in the messages HWSIM_YAWMD_RX_INFO sent by yawmd.
+ * Information of the struct means that interface .mac_addr should receive a
+ * copy of the frame (the message HWSIM_YAWMD_RX_INFO refers to) with .signal.
+ */
+struct hwsim_itf_recv_info
+{
+	u8 mac_addr[ETH_ALEN];
+	u32 signal;
+} __packed __aligned(1);
 
 /**
  * DOC: Frame transmission support over virtio
@@ -269,7 +302,8 @@ struct hwsim_tx_rate_flag {
  * @HWSIM_VQ_RX: receive frames and transmission info reports
  * @HWSIM_NUM_VQS: enum limit
  */
-enum {
+enum
+{
 	HWSIM_VQ_TX,
 	HWSIM_VQ_RX,
 	HWSIM_NUM_VQS,

@@ -9,16 +9,19 @@ use netlink_packet_utils::{
     DecodeError, Emitable, Parseable,
 };
 
-use crate::mac80211_hwsim::structs::{IEEE80211Header, ReceiverInfo, TXInfo, TXInfoFlag};
+use crate::mac80211_hwsim::{
+    structs::{Frame, IEEE80211Header, ReceiverInfo, TXInfo, TXInfoFlag},
+    MACAddress,
+};
 
 use super::super::constants::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HwsimAttrs {
     Unspec(),
-    AddrReceiver([u8; ETH_ALEN]),
-    AddrTransmitter([u8; ETH_ALEN]),
-    Frame(),
+    AddrReceiver(MACAddress),
+    AddrTransmitter(MACAddress),
+    Frame(Frame),
     Flags(u32),
     RXRate(u32),
     Signal(u32),
@@ -37,14 +40,9 @@ pub enum HwsimAttrs {
     Freq(u32),
     Pad(),
     TXInfoFlags([TXInfoFlag; IEEE80211_TX_MAX_RATES]),
-    PermAddr([u8; ETH_ALEN]),
+    PermAddr(MACAddress),
     IftypeSupport(u32),
     CipherSupport(Vec<u32>),
-    FrameHeader(IEEE80211Header),
-    FrameLength(u32),
-    FrameID(),
-    ReceiverInfo(ReceiverInfo),
-    TimeStamp(i64),
 }
 
 impl Nla for HwsimAttrs {
@@ -54,7 +52,7 @@ impl Nla for HwsimAttrs {
             Unspec() => todo!(),
             AddrReceiver(v) => size_of_val(v),
             AddrTransmitter(v) => size_of_val(v),
-            Frame() => todo!(),
+            Frame(v) => v.buffer_len(),
             Flags(v) => size_of_val(v),
             RXRate(v) => size_of_val(v),
             Signal(v) => size_of_val(v),
@@ -76,11 +74,6 @@ impl Nla for HwsimAttrs {
             PermAddr(v) => size_of_val(v),
             IftypeSupport(v) => size_of_val(v),
             CipherSupport(v) => size_of_val(v),
-            FrameHeader(_) => 0,
-            FrameLength(_) => 0,
-            FrameID() => todo!(),
-            ReceiverInfo(v) => v.buffer_len(),
-            TimeStamp(v) => size_of_val(v),
         }
     }
 
@@ -90,7 +83,7 @@ impl Nla for HwsimAttrs {
             Unspec() => HWSIM_ATTR_UNSPEC,
             AddrReceiver(_) => HWSIM_ATTR_ADDR_RECEIVER,
             AddrTransmitter(_) => HWSIM_ATTR_ADDR_TRANSMITTER,
-            Frame() => HWSIM_ATTR_FRAME,
+            Frame(_) => HWSIM_ATTR_FRAME,
             Flags(_) => HWSIM_ATTR_FLAGS,
             RXRate(_) => HWSIM_ATTR_RX_RATE,
             Signal(_) => HWSIM_ATTR_SIGNAL,
@@ -112,11 +105,6 @@ impl Nla for HwsimAttrs {
             PermAddr(_) => HWSIM_ATTR_PERM_ADDR,
             IftypeSupport(_) => HWSIM_ATTR_IFTYPE_SUPPORT,
             CipherSupport(_) => HWSIM_ATTR_CIPHER_SUPPORT,
-            FrameHeader(_) => HWSIM_ATTR_FRAME_HEADER,
-            FrameLength(_) => HWSIM_ATTR_FRAME_LENGTH,
-            FrameID() => HWSIM_ATTR_FRAME_ID,
-            ReceiverInfo(_) => HWSIM_ATTR_RECEIVER_INFO,
-            TimeStamp(_) => HWSIM_ATTR_FRAME_TIMESTAMP,
         }
     }
 
@@ -130,7 +118,7 @@ impl Nla for HwsimAttrs {
             AddrTransmitter(v) => {
                 buffer.copy_from_slice(v);
             }
-            Frame() => todo!(),
+            Frame(v) => v.emit(buffer),
             Flags(v) => NativeEndian::write_u32(buffer, *v),
             RXRate(v) => NativeEndian::write_u32(buffer, *v),
             Signal(v) => NativeEndian::write_u32(buffer, *v),
@@ -168,11 +156,6 @@ impl Nla for HwsimAttrs {
                     NativeEndian::write_u32(buffer, *vv);
                 }
             }
-            FrameHeader(_) => {}
-            FrameLength(_) => {}
-            FrameID() => todo!(),
-            ReceiverInfo(v) => (*v).emit(buffer),
-            TimeStamp(v) => NativeEndian::write_i64(buffer, *v),
         }
     }
 }
@@ -187,6 +170,22 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for HwsimAttrs {
             HWSIM_ATTR_ADDR_TRANSMITTER => Self::AddrTransmitter(
                 parse_mac(payload).context("failed to parse HWSIM_ATTR_ADDR_TRANSMITTER")?,
             ),
+            HWSIM_ATTR_FRAME => {
+                let mut frame_header: IEEE80211Header = IEEE80211Header::default();
+                frame_header.frame_control.copy_from_slice(&payload[..2]);
+                frame_header.duration_id.copy_from_slice(&payload[2..4]);
+                frame_header.addr1.copy_from_slice(&payload[4..10]);
+                frame_header.addr2.copy_from_slice(&payload[10..16]);
+                frame_header.addr3.copy_from_slice(&payload[16..22]);
+                frame_header.seq_ctrl.copy_from_slice(&payload[22..24]);
+                frame_header.addr4.copy_from_slice(&payload[24..30]);
+                frame_header.qos.copy_from_slice(&payload[30..32]);
+
+                Self::Frame(Frame {
+                    header: frame_header,
+                    payload: payload[32..].to_vec(),
+                })
+            }
             HWSIM_ATTR_FLAGS => {
                 Self::Flags(parse_u32(payload).context("failed to parse HWSIM_ATTR_FLAGS")?)
             }
@@ -247,28 +246,6 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for HwsimAttrs {
             HWSIM_ATTR_PERM_ADDR => {
                 Self::PermAddr(parse_mac(payload).context("failed to parse HWSIM_ATTR_PERM_ADDR")?)
             }
-            HWSIM_ATTR_FRAME_HEADER => {
-                let mut frame_header: IEEE80211Header = IEEE80211Header::default();
-                frame_header.frame_control.copy_from_slice(&payload[..2]);
-                frame_header.duration_id.copy_from_slice(&payload[2..4]);
-                frame_header.addr1.copy_from_slice(&payload[4..10]);
-                frame_header.addr2.copy_from_slice(&payload[10..16]);
-                frame_header.addr3.copy_from_slice(&payload[16..22]);
-                frame_header.seq_ctrl.copy_from_slice(&payload[22..24]);
-                frame_header.addr4.copy_from_slice(&payload[24..30]);
-                frame_header.qos.copy_from_slice(&payload[30..32]);
-
-                Self::FrameHeader(frame_header)
-            }
-            HWSIM_ATTR_FRAME_LENGTH => Self::FrameLength(
-                parse_u32(payload).context("failed to parse HWSIM_ATTR_FRAME_LENGTH")?,
-            ),
-            HWSIM_ATTR_FRAME_TIMESTAMP => Self::TimeStamp(
-                parse_u64(payload)
-                    .context("ailed to parse HWSIM_ATTR_FRAME_TIMESTAMP")?
-                    .try_into()
-                    .unwrap(),
-            ),
             kind => return Err(DecodeError::from(format!("Unknown NLA type: {kind}"))),
         })
     }

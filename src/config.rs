@@ -9,6 +9,7 @@ use crate::{HwsimRadio, HwsimRadios};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Radio {
     pub id: usize,
+    pub node_id: usize,
     pub channels: u32,
     pub support_p2p_device: bool,
     pub use_chanctx: bool,
