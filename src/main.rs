@@ -201,7 +201,7 @@ async fn radio_process(
     mut rx: UnboundedReceiver<GenlYawmdRXInfo>,
     mut terminate_rx: broadcast::Receiver<()>,
 ) {
-    println!("Spawning the {} link.", &id + 1);
+    println!("Spawning the {} link.", &id);
     // dbg!(template);
 
     // Prepare netns and ..

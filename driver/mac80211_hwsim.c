@@ -3904,7 +3904,7 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 
 	/* look for the skb matching the cookie passed back from user */
 	// printk(KERN_INFO "start locking");
-	// spin_lock_irqsave(&data2->pending.lock, flags);
+	spin_lock_irqsave(&data2->pending.lock, flags);
 	// printk(KERN_INFO "lockinged");
 	skb_queue_walk_safe(&data2->pending, skb, tmp)
 	{
@@ -3915,13 +3915,13 @@ static int hwsim_yawmd_rx(struct sk_buff *skb_2,
 
 		if (skb_cookie == ret_skb_cookie)
 		{
-			skb_unlink(skb, &data2->pending);
+			__skb_unlink(skb, &data2->pending);
 			found = true;
 			break;
 		}
 	}
 	// printk(KERN_INFO "start unlock");
-	// spin_unlock_irqrestore(&data2->pending.lock, flags);
+	spin_unlock_irqrestore(&data2->pending.lock, flags);
 	// printk(KERN_INFO "unlocked");
 
 	/* not found */
