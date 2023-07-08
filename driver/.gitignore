@@ -4,3 +4,4 @@
 !mac80211_hwsim.h
 !Makefile
 !.gitignore
+!test
