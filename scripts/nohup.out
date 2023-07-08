@@ -663,3 +663,19 @@ Gdk-Message: 16:13:24.860: Error reading events from display: Broken pipe
 (process:12039): GLib-GIO-CRITICAL **: 10:12:12.527: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
 
 (process:12038): GLib-GIO-CRITICAL **: 10:12:12.527: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:44436): GLib-GIO-CRITICAL **: 10:30:12.230: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:44435): GLib-GIO-CRITICAL **: 10:30:12.232: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:44434): GLib-GIO-CRITICAL **: 10:30:12.233: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:44437): GLib-GIO-CRITICAL **: 10:30:12.234: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:52175): GLib-GIO-CRITICAL **: 11:02:37.789: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:52176): GLib-GIO-CRITICAL **: 11:02:37.790: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:52178): GLib-GIO-CRITICAL **: 11:02:37.790: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:52177): GLib-GIO-CRITICAL **: 11:02:37.794: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed

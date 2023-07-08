@@ -46,8 +46,7 @@
 
 #define WARN_QUEUE 100
 #define MAX_QUEUE 200
-#define MY_BUF_SIZE (4096)
-#define MAX_PAGE_NUM 512
+#define MAX_PAGE_NUM_PER_RADIO 512
 
 MODULE_AUTHOR("Jouni Malinen");
 MODULE_DESCRIPTION("Software simulator of 802.11 radio(s) for mac80211");
@@ -73,17 +72,32 @@ static bool support_p2p_device = true;
 module_param(support_p2p_device, bool, 0444);
 MODULE_PARM_DESC(support_p2p_device, "Support P2P-Device interface type");
 
-// vm_device
+// sm_device
 
-struct vm_buffer
+struct sm_buffer
 {
 	unsigned char *name;
-	struct page *pages[MAX_PAGE_NUM];
+	struct page *pages[MAX_PAGE_NUM_PER_RADIO];
 	int page_size;
 	struct list_head list;
 };
 
-LIST_HEAD(vm_buffer_head);
+LIST_HEAD(sm_buffer_head);
+
+static struct sm_buffer *get_sm_buffer_by_name(const char *name)
+{
+	struct sm_buffer *entry;
+
+	list_for_each_entry(entry, &sm_buffer_head, list)
+	{
+		printk(KERN_INFO "Data: %s\n", entry->name);
+		if (strcmp(entry->name, name) == 0)
+		{
+			return entry;
+		}
+	}
+	return NULL;
+}
 
 static int
 mydev_open(struct inode *inode, struct file *filp)
@@ -100,44 +114,52 @@ static int mydev_release(struct inode *inode, struct file *filp)
 
 static int mydev_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	struct vm_buffer *entry;
-	bool found = false;
+	struct sm_buffer *entry;
 	unsigned long vm_size = vma->vm_end - vma->vm_start;
-	unsigned long pfn;
+	unsigned long vm_page_size = vm_size >> PAGE_SHIFT;
+	unsigned long i, pfn;
 
-	// 遍历链表并打印数据
-	list_for_each_entry(entry, &vm_buffer_head, list)
-	{
-		printk(KERN_INFO "Data: %s\n", entry->name);
-		if (strcmp(entry->name, filp->f_path.dentry->d_iname) == 0)
-		{
-			found = true;
-			break;
-		}
-	}
+	// 根据name找到对应Radio的sm_buffer
+	entry = get_sm_buffer_by_name(filp->f_path.dentry->d_iname);
 
-	if (!found)
+	if (!entry)
 	{
 		return -EIO;
 	}
+
 	// // printk(KERN_INFO "mydev: device mmap-- %s\n", filp->f_path.dentry->d_iname);
 
 	// unsigned long i, pfn;
 
 	// printk(KERN_INFO "vm_start %p", vma->vm_start);
 	// /* Limit allocation to MY_BUF_SIZE */
-	if (vm_size > 4096)
+	if (vm_page_size > MAX_PAGE_NUM_PER_RADIO)
 	{
-		printk(KERN_ERR "mydev: requested size too large\n");
+		printk(KERN_ERR "mac80211_hwsim: mmap size too large\n");
 		return -EIO;
 	}
 
-	pfn = page_to_pfn(entry->pages[0]);
-	if (remap_pfn_range(vma, vma->vm_start, pfn, PAGE_SIZE, vma->vm_page_prot))
+	for (i = 0; i < vm_page_size; i++)
 	{
-		printk(KERN_ERR "mydev: remap failed\n");
-		return -EIO;
+		if (!entry->pages[i])
+		{
+			printk(KERN_ERR "mac80211_hwsim: mmap target page not allocated\n");
+			return -EIO;
+		}
+		pfn = page_to_pfn(entry->pages[i]);
+		if (remap_pfn_range(vma, vma->vm_start + (i << PAGE_SHIFT), pfn, PAGE_SIZE, vma->vm_page_prot))
+		{
+			printk(KERN_ERR "mac80211_hwsim: mmap remap failed\n");
+			return -EIO;
+		}
 	}
+
+	// pfn = page_to_pfn(entry->pages[0]);
+	// if (remap_pfn_range(vma, vma->vm_start, pfn, PAGE_SIZE, vma->vm_page_prot))
+	// {
+	// 	printk(KERN_ERR "mydev: remap failed\n");
+	// 	return -EIO;
+	// }
 
 	// /* Get physical page numbers for all virtual pages */
 	// for (i = 0; i < MY_BUF_SIZE; i += PAGE_SIZE)
@@ -799,7 +821,7 @@ struct mac80211_hwsim_data
 	u64 tx_dropped;
 	u64 tx_failed;
 
-	struct miscdevice *vm_device;
+	struct miscdevice *sm_device;
 };
 
 static const struct rhashtable_params hwsim_rht_params = {
@@ -3227,9 +3249,9 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 	struct net *net;
 	int idx, i;
 	int n_limits = 0;
-	struct miscdevice *vm_device;
+	struct miscdevice *sm_device;
 	int ret = -ENOMEM;
-	struct vm_buffer *vm_buffer_elem;
+	struct sm_buffer *vm_buffer_elem;
 	struct page *page;
 	char *my_buf;
 	const char *test_src = "Hello, kernel!";
@@ -3613,20 +3635,20 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 	hwsim_mcast_new_radio(idx, info, param);
 
 	// Create device
-	vm_device = kmalloc(sizeof(struct miscdevice), GFP_KERNEL);
-	vm_device->minor = MISC_DYNAMIC_MINOR;
-	vm_device->name = kstrdup(wiphy_name(hw->wiphy), GFP_KERNEL);
-	vm_device->fops = &mydev_fops;
-	data->vm_device = vm_device;
+	sm_device = kmalloc(sizeof(struct miscdevice), GFP_KERNEL);
+	sm_device->minor = MISC_DYNAMIC_MINOR;
+	sm_device->name = kstrdup(wiphy_name(hw->wiphy), GFP_KERNEL);
+	sm_device->fops = &mydev_fops;
+	data->sm_device = sm_device;
 
-	ret = misc_register(data->vm_device);
+	ret = misc_register(data->sm_device);
 	if (ret)
 	{
 		printk(KERN_ERR "mac80211_hwsim: failed to register device\n");
 		goto failed_vm_device;
 	}
 
-	vm_buffer_elem = kmalloc(sizeof(struct vm_buffer), GFP_KERNEL);
+	vm_buffer_elem = kmalloc(sizeof(struct sm_buffer), GFP_KERNEL);
 	vm_buffer_elem->name = kstrdup(wiphy_name(hw->wiphy), GFP_KERNEL);
 	if (!vm_buffer_elem->name)
 	{
@@ -3646,12 +3668,12 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 	// printk("addr = 0x%lx\n", (unsigned long)page);
 	// printk("virtual addr = 0x%lx\n", my_buf);
 
-	memset(my_buf, 0, MY_BUF_SIZE);
+	memset(my_buf, 0, PAGE_SIZE);
 	strcpy(my_buf, test_src);
 	// printk(KERN_INFO "Read from mmap: %s\n", my_buf);
 
 	spin_lock(&sm_buffer_lock);
-	list_add_tail(&vm_buffer_elem->list, &vm_buffer_head);
+	list_add_tail(&vm_buffer_elem->list, &sm_buffer_head);
 	spin_unlock(&sm_buffer_lock);
 
 	return idx;
@@ -3659,7 +3681,7 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 failed_vm_buffer_elem:
 	kfree(vm_buffer_elem);
 failed_vm_device:
-	kfree(vm_device);
+	kfree(sm_device);
 failed_final_insert:
 	debugfs_remove_recursive(data->debugfs);
 	ieee80211_unregister_hw(data->hw);
@@ -3712,29 +3734,32 @@ static void mac80211_hwsim_del_radio(struct mac80211_hwsim_data *data,
 									 const char *hwname,
 									 struct genl_info *info)
 {
-	// struct vm_buffer *entry;
-	// bool found = false;
+	struct sm_buffer *entry;
+	unsigned long i;
+
 	hwsim_mcast_del_radio(data->idx, hwname, info);
 	debugfs_remove_recursive(data->debugfs);
 	ieee80211_unregister_hw(data->hw);
 	device_release_driver(data->dev);
 	device_unregister(data->dev);
 	ieee80211_free_hw(data->hw);
-	misc_deregister(data->vm_device);
-	// kfree();
-	kfree(data->vm_device);
-	// list_for_each_entry(entry, vm_buffer_head, list)
-	// {
-	// 	if (strcmp(entry->name, hwname) == 0)
-	// 	{
-	// 		found = true;
-	// 		break;
-	// 	}
-	// }
-	// if (found)
-	// {
-	// 	kfree(entry->my_buf_pages[0]);
-	// }
+
+	// Clean shared memory part
+	misc_deregister(data->sm_device);
+	kfree(data->sm_device);
+	entry = get_sm_buffer_by_name(hwname);
+	if (entry)
+	{
+		for (i = 0; i < entry->page_size; i++)
+		{
+			if (!entry->pages[i])
+				kfree(entry->pages[i]);
+			else
+				printk(KERN_ERR "mac80211_hwsim: free page that unconsistent with page size\n");
+		}
+	}
+	else
+		printk(KERN_ERR "mac80211_hwsim: cannot find corresponding sm_buffer while delete radio\n");
 }
 
 static int mac80211_hwsim_get_radio(struct sk_buff *skb,

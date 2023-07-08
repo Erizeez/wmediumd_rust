@@ -4,7 +4,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#define DEV_NAME "/dev/phy8"
+#define DEV_NAME "/dev/phy12"
 #define MEM_SIZE 4096
 
 int main()
