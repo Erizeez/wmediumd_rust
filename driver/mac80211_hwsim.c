@@ -47,6 +47,7 @@
 #define WARN_QUEUE 100
 #define MAX_QUEUE 200
 #define MAX_PAGE_NUM_PER_RADIO 512
+#define DEFAULT_PAGE_NUM_PER_RADIO 64
 
 MODULE_AUTHOR("Jouni Malinen");
 MODULE_DESCRIPTION("Software simulator of 802.11 radio(s) for mac80211");
@@ -894,6 +895,7 @@ static const struct nla_policy hwsim_genl_policy[HWSIM_ATTR_MAX + 1] = {
 	[HWSIM_ATTR_PERM_ADDR] = NLA_POLICY_ETH_ADDR_COMPAT,
 	[HWSIM_ATTR_IFTYPE_SUPPORT] = {.type = NLA_U32},
 	[HWSIM_ATTR_CIPHER_SUPPORT] = {.type = NLA_BINARY},
+	[HWSIM_ATTR_SM_PAGE_NUM] = {.type = NLA_U32},
 };
 
 #if IS_REACHABLE(CONFIG_VIRTIO)
@@ -2925,6 +2927,7 @@ struct hwsim_new_radio_params
 	u32 iftypes;
 	u32 *ciphers;
 	u8 n_ciphers;
+	u32 sm_page_num;
 };
 
 static void hwsim_mcast_config_msg(struct sk_buff *mcast_skb,
@@ -3253,8 +3256,6 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 	int ret = -ENOMEM;
 	struct sm_buffer *vm_buffer_elem;
 	struct page *page;
-	char *my_buf;
-	const char *test_src = "Hello, kernel!";
 
 	if (WARN_ON(param->channels > 1 && !param->use_chanctx))
 		return -EINVAL;
@@ -3635,6 +3636,11 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 	hwsim_mcast_new_radio(idx, info, param);
 
 	// Create device
+	if (!param->sm_page_num)
+	{
+		param->sm_page_num = DEFAULT_PAGE_NUM_PER_RADIO;
+		printk(KERN_INFO "mac80211_hwsim: use dafault for page num\n");
+	}
 	sm_device = kmalloc(sizeof(struct miscdevice), GFP_KERNEL);
 	sm_device->minor = MISC_DYNAMIC_MINOR;
 	sm_device->name = kstrdup(wiphy_name(hw->wiphy), GFP_KERNEL);
@@ -3655,22 +3661,28 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 		printk(KERN_ERR "mac80211_hwsim: failed to copy wiphy_name to vm_buffer_elem\n");
 		goto failed_vm_buffer_elem;
 	}
-	page = alloc_page(GFP_KERNEL);
-	if (!page)
+
+	// Allocate pages
+	for (i = 0; i < param->sm_page_num; i++)
 	{
-		printk(KERN_ERR "mydev: failed to allocate memory\n");
-		goto failed_vm_buffer_elem;
+		page = alloc_page(GFP_KERNEL);
+		if (!page)
+		{
+			printk(KERN_ERR "mydev: failed to allocate memory\n");
+			goto failed_vm_buffer_elem;
+		}
+		vm_buffer_elem->pages[i] = page;
 	}
 
-	vm_buffer_elem->pages[0] = page;
-
-	my_buf = page_address(page);
-	// printk("addr = 0x%lx\n", (unsigned long)page);
-	// printk("virtual addr = 0x%lx\n", my_buf);
-
-	memset(my_buf, 0, PAGE_SIZE);
-	strcpy(my_buf, test_src);
-	// printk(KERN_INFO "Read from mmap: %s\n", my_buf);
+	// Test --
+	// char *my_buf;
+	// const char *test_src = "Hello, kernel!";
+	// my_buf = page_address(vm_buffer_elem->pages[0]);
+	// // printk("addr = 0x%lx\n", (unsigned long)page);
+	// // printk("virtual addr = 0x%lx\n", my_buf);
+	// memset(my_buf, 0, PAGE_SIZE);
+	// strcpy(my_buf, test_src);
+	// -- Test
 
 	spin_lock(&sm_buffer_lock);
 	list_add_tail(&vm_buffer_elem->list, &sm_buffer_head);
@@ -4263,6 +4275,11 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 		if (!hwname)
 			return -ENOMEM;
 		param.hwname = hwname;
+	}
+
+	if (info->attrs[HWSIM_ATTR_SM_PAGE_NUM])
+	{
+		param.sm_page_num = nla_get_u32(info->attrs[HWSIM_ATTR_SM_PAGE_NUM]);
 	}
 
 	ret = mac80211_hwsim_new_radio(info, &param);
