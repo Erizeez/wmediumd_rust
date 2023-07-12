@@ -467,7 +467,7 @@ static const struct ieee80211_sta_s1g_cap hwsim_s1g_cap = {
 			S1G_CAP8_TWT_RESPOND | S1G_CAP8_TWT_REQUEST,
 			0},
 	.nss_mcs = {0xfc | 1, /* MCS 7 for 1 SS */
-						  /* RX Highest Supported Long GI Data Rate 0:7 */
+				/* RX Highest Supported Long GI Data Rate 0:7 */
 				0,
 				/* RX Highest Supported Long GI Data Rate 0:7 */
 				/* TX S1G MCS Map 0:6 */
@@ -3715,6 +3715,7 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	spin_lock_irqsave(&data2->pending.lock, flags);
 	skb_queue_walk_safe(&data2->pending, skb, tmp)
 	{
+		// j++;
 		uintptr_t skb_cookie;
 
 		txi = IEEE80211_SKB_CB(skb);
@@ -3732,6 +3733,8 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	/* not found */
 	if (!found)
 		goto out;
+
+	printk(KERN_INFO "Found");
 
 	/* Tx info received because the frame was broadcasted on user space,
 	 so we get all the necessary info: tx attempts and skb control buff */
@@ -3770,6 +3773,7 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	ieee80211_tx_status_irqsafe(data2->hw, skb);
 	return 0;
 out:
+	printk(KERN_ERR "EINVAL");
 	return -EINVAL;
 }
 

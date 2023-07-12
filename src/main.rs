@@ -312,6 +312,23 @@ async fn radio_process(
                                         }
                                     }
                                 }
+                                let signal = (30 - 91) as u32;
+
+                                let mut tx_info_frame = GenlTXInfoFrame::default();
+                                tx_info_frame.addr_transmitter = data.addr_transmitter;
+                                tx_info_frame.flags = data.flags;
+                                tx_info_frame.tx_info = data.tx_info;
+                                tx_info_frame.cookie = data.cookie;
+                                tx_info_frame.signal = signal;
+                                match handle.notify(tx_info_frame.generate_genl_message()).await {
+                                    Ok(_) => {
+                                        // println!("handle 1 frame tx info");
+
+                                    }
+                                    Err(_) => {
+                                        println!("fail frame tx info");
+                                    }
+                                }
                                 // println!("1");
                                 // println!("{} -- {:?}", id, data.frame_header.addr1);
 
@@ -330,13 +347,10 @@ async fn radio_process(
                 let signal = (30 - 91) as u32;
 
                 let mut frame_rx = GenlFrameRX::default();
-                let mut tx_info_frame = GenlTXInfoFrame::default();
-                tx_info_frame.addr_transmitter = msg.addr_transmitter;
-                tx_info_frame.flags = msg.flags;
+
                 frame_rx.rx_rate = msg.tx_info[0].idx as u32;
                 frame_rx.signal = signal;
-                tx_info_frame.tx_info = msg.tx_info;
-                tx_info_frame.cookie = msg.cookie;
+
                 frame_rx.freq = msg.freq;
                 frame_rx.frame = msg.frame;
                 frame_rx.addr_receiver = radio_info.radio.perm_addr.clone();
@@ -357,15 +371,6 @@ async fn radio_process(
                     }
                 }
 
-                match handle.notify(tx_info_frame.generate_genl_message()).await {
-                    Ok(_) => {
-                        // println!("handle 1 frame tx info");
-
-                    }
-                    Err(_) => {
-                        println!("fail frame tx info");
-                    }
-                }
             }
             _ = terminate_rx.recv() => {
                 // 接收到终止信号，退出循环
