@@ -109,7 +109,7 @@ impl ParseableParametrized<[u8], GenlHeader> for GenlMAC {
     }
 }
 
-fn parse_nlas(buf: &[u8]) -> Result<Vec<HwsimAttrs>, DecodeError> {
+pub fn parse_nlas(buf: &[u8]) -> Result<Vec<HwsimAttrs>, DecodeError> {
     let nlas = NlasIterator::new(buf)
         .map(|nla| nla.and_then(|nla| HwsimAttrs::parse(&nla)))
         .collect::<Result<Vec<_>, _>>()

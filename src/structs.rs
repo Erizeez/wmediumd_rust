@@ -2,6 +2,7 @@ use crate::mac80211_hwsim::ctrl::nlas::HwsimAttrs;
 use crate::mac80211_hwsim::ctrl::{GenlAutoConstruct, GenlMAC, HwsimCmd};
 use crate::mac80211_hwsim::structs::{Frame, IEEE80211Header, ReceiverInfo, TXInfo, TXInfoFlag};
 use crate::mac80211_hwsim::{constants::*, MACAddress};
+use anyhow::Error;
 use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NLM_F_DUMP, NLM_F_REQUEST};
 use netlink_packet_generic::GenlMessage;
 
@@ -36,6 +37,7 @@ pub struct GenlFrameTX {
     pub cookie: u64,
     pub freq: u32,
     pub tx_info_flags: [TXInfoFlag; IEEE80211_TX_MAX_RATES],
+    pub shared_memory_pointer: u64,
 }
 
 impl GenlAutoConstruct for GenlFrameTX {
@@ -69,6 +71,9 @@ impl GenlAutoConstruct for GenlFrameTX {
                 TXInfoFlags(v) => {
                     parsed_data.tx_info_flags = *v;
                 }
+                SharedMemoryPointer(v) => {
+                    parsed_data.shared_memory_pointer = *v;
+                }
                 _ => {}
             }
         }
@@ -83,6 +88,28 @@ pub struct GenlFrameRX {
     pub rx_rate: u32,
     pub signal: u32,
     pub freq: u32,
+    pub shared_memory_pointer: u64,
+}
+
+impl TryInto<GenlMAC> for GenlFrameRX {
+    type Error = Error;
+    fn try_into(self) -> Result<GenlMAC, Self::Error> {
+        let mut nlas = vec![];
+
+        use HwsimAttrs::*;
+
+        // nlas.push(AddrReceiver(self.addr_receiver));
+        // nlas.push(Frame(self.frame.clone()));
+        // nlas.push(RXRate(self.rx_rate));
+        // nlas.push(Signal(self.signal));
+        // nlas.push(Freq(self.freq));
+        nlas.push(SharedMemoryPointer(self.shared_memory_pointer));
+
+        Ok(GenlMAC {
+            cmd: HwsimCmd::Frame,
+            nlas,
+        })
+    }
 }
 
 impl GenlAutoConstruct for GenlFrameRX {

@@ -4,6 +4,12 @@ use libc::{
     SOL_SOCKET, SO_BINDTODEVICE,
 };
 use mac80211_hwsim::MACAddress;
+use memmap2::MmapMut;
+use memmap2::MmapOptions;
+use netlink_packet_utils::byteorder::ByteOrder;
+use netlink_packet_utils::byteorder::NativeEndian;
+use netlink_packet_utils::parsers::parse_u32;
+use netlink_packet_utils::Emitable;
 use netns_rs::get_from_current_thread;
 use netns_rs::NetNs;
 use std::collections::HashMap;
@@ -13,9 +19,12 @@ use std::os::fd::AsRawFd;
 use std::time::Duration;
 use std::{ffi::CString, os::fd::RawFd};
 use structs::GenlFrameRX;
+use tokio::fs::File;
+use tokio::fs::OpenOptions;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 
 use anyhow::Error;
@@ -47,9 +56,116 @@ mod config;
 mod mac80211_hwsim;
 mod structs;
 
+pub const MAX_PAGE_NUM_PER_RADIO: usize = 64;
+pub const MAX_PAGE_ORDER_PER_RADIO: usize = 11;
+pub const DEFAULT_PAGE_ORDER_PER_RADIO: usize = 10;
+pub const PAGE_SHIFT: usize = 12;
+pub const PAGE_SIZE: usize = 1 << PAGE_SHIFT;
+
+#[derive(Clone, Debug, Default)]
+struct SharedMemoryBuffer {
+    page_order: usize,
+    page_size: usize,
+
+    tx_offset: usize,
+    tx_size: usize,
+    tx_page_offset: usize,
+    tx_page_size: usize,
+
+    rx_offset: usize,
+    rx_size: usize,
+    rx_page_offset: usize,
+    rx_page_size: usize,
+
+    tx_end: usize,
+}
+
+impl SharedMemoryBuffer {
+    fn read_data_from_pointer_by_len(
+        &self,
+        buffer: &[u8],
+        pointer: usize,
+        len: usize,
+    ) -> (Box<[u8]>, usize) {
+        let mut boxed_slice: Box<[u8]> = vec![0; len].into_boxed_slice();
+
+        let l = self.rx_offset + pointer;
+        let r = self.rx_offset + (pointer + len) % self.rx_size;
+
+        if l > r {
+            boxed_slice[0..(self.rx_size - pointer)]
+                .copy_from_slice(&buffer[l..(self.rx_offset + self.rx_size)]);
+            boxed_slice[(self.rx_size - pointer)..].copy_from_slice(&buffer[self.rx_offset..r]);
+        } else {
+            boxed_slice.copy_from_slice(&buffer[l..r]);
+        }
+
+        (boxed_slice, r - self.rx_offset)
+    }
+
+    fn parse_data(&self, buffer: &[u8], pointer: usize) -> Result<Box<GenlFrameTX>, Error> {
+        let (length_slice, new_pointer) = self.read_data_from_pointer_by_len(buffer, pointer, 4);
+        let length = parse_u32(&length_slice).expect("cannot parse length");
+
+        let (raw_data, _) =
+            self.read_data_from_pointer_by_len(buffer, new_pointer, length as usize);
+
+        let raw_nlas = parse_nlas(&raw_data)?;
+
+        Ok(Box::<GenlFrameTX>::new(parse_genl_message::<GenlFrameTX>(
+            GenlMAC {
+                cmd: HwsimCmd::Frame,
+                nlas: raw_nlas,
+            },
+        )))
+    }
+
+    fn write_data_to_pointer_by_len(
+        &mut self,
+        shared_memory: &mut [u8],
+        buffer: &[u8],
+        len: usize,
+    ) -> usize {
+        let l = self.tx_offset + self.tx_end;
+        let r = self.tx_offset + (self.tx_end + len) % self.tx_size;
+
+        if l > r {
+            shared_memory[l..(self.tx_offset + self.tx_size)]
+                .copy_from_slice(&buffer[0..(self.tx_size - self.tx_end)]);
+            shared_memory[self.tx_offset..r]
+                .copy_from_slice(&buffer[(self.tx_size - self.tx_end)..]);
+        } else {
+            shared_memory[l..r].copy_from_slice(buffer);
+        }
+
+        self.tx_end += len;
+
+        r - self.tx_offset
+    }
+
+    fn emit_data(&mut self, shared_memory: &mut [u8], data: GenlFrameRX) -> usize {
+        let genl_data: GenlMAC = data.try_into().expect("fail to into GenlMAC");
+        let length = genl_data.buffer_len();
+
+        let tx_end = self.tx_end;
+
+        let mut raw_data: Box<[u8]> = vec![0; length].into_boxed_slice();
+        genl_data.emit(&mut raw_data);
+
+        let mut length_buffer: Box<[u8]> = vec![0; 4].into_boxed_slice();
+        NativeEndian::write_u32(&mut length_buffer, length as u32);
+
+        self.write_data_to_pointer_by_len(shared_memory, &length_buffer, 4);
+        self.write_data_to_pointer_by_len(shared_memory, &raw_data, raw_data.len());
+
+        tx_end
+    }
+}
+
 #[derive(Clone, Debug)]
 struct RadioInfo {
     radio: Radio,
+    sm_buffer: SharedMemoryBuffer,
     tx: UnboundedSender<GenlFrameTX>,
 }
 
@@ -93,10 +209,25 @@ async fn main() {
     for i in 0..num {
         let (tx, rx) = mpsc::unbounded_channel::<GenlFrameTX>();
         rxs.insert(config.radios[i].id, rx);
+
+        let mut sm_buffer = SharedMemoryBuffer::default();
+        sm_buffer.page_order = DEFAULT_PAGE_ORDER_PER_RADIO;
+        sm_buffer.page_size = 2 << DEFAULT_PAGE_ORDER_PER_RADIO;
+        sm_buffer.rx_page_offset = 0;
+        sm_buffer.rx_page_size = sm_buffer.page_size / 2;
+        sm_buffer.rx_offset = sm_buffer.rx_page_offset << PAGE_SHIFT;
+        sm_buffer.rx_size = sm_buffer.rx_page_size << PAGE_SHIFT;
+
+        sm_buffer.tx_page_offset = sm_buffer.rx_page_offset + sm_buffer.rx_page_size;
+        sm_buffer.tx_page_size = sm_buffer.page_size - sm_buffer.rx_page_size;
+        sm_buffer.tx_offset = sm_buffer.tx_page_offset << PAGE_SHIFT;
+        sm_buffer.tx_size = sm_buffer.tx_page_size << PAGE_SHIFT;
+
         radio_infos.insert(
             config.radios[i].id,
             RadioInfo {
                 radio: config.radios[i].clone(),
+                sm_buffer,
                 tx,
             },
         );
@@ -196,15 +327,30 @@ macro_rules! mac_array {
     }};
 }
 
+fn print_hex(slice: &[u8], offset: usize, len: usize) {
+    let end = offset + len;
+    if end > slice.len() {
+        return;
+    }
+    print!("HEX: ----- [");
+
+    for i in offset..end {
+        print!("{:02X} ", slice[i]);
+    }
+    println!("] -----");
+}
+
 async fn radio_process(
     id: usize,
-    radio_info: RadioInfo,
+    mut radio_info: RadioInfo,
     txs: Vec<TXInfo>,
     mut rx: UnboundedReceiver<GenlFrameTX>,
     mut terminate_rx: broadcast::Receiver<()>,
 ) {
     println!("Spawning the {} link.", &id);
     // dbg!(template);
+
+    // let tx_lock: Mutex<usize> = Mutex::new(1);
 
     // Prepare netns and ..
 
@@ -258,6 +404,31 @@ async fn radio_process(
 
     new_radio_nl(&mut handle, new_radio).await;
 
+    let dev_file_path = "/dev/".to_string() + &radio_info.radio.radio_name.clone();
+    sleep(Duration::from_secs(1)).await;
+    // println!("{}", &dev_file_path);
+
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(&dev_file_path)
+        .await
+        .expect("Failed to open dev");
+
+    // println!("{}", (2 << DEFAULT_PAGE_ORDER_PER_RADIO) * 4096);
+    // file.set_len((2 << DEFAULT_PAGE_ORDER_PER_RADIO) * 4096)
+    //     .await
+    //     .expect("Failed to set len");
+    println!("{}", radio_info.sm_buffer.page_size as usize);
+    let mut mmap = unsafe {
+        // MmapMut::map_mut(&file).expect("Failed to mmap")
+        MmapOptions::new()
+            .len(radio_info.sm_buffer.page_size as usize * PAGE_SIZE)
+            .map_mut(&file)
+            .expect("Failed to mmap")
+    };
+
     loop {
         // let ns = get_from_current_thread().unwrap();
         // println!("{:?}", ns.file().metadata());
@@ -274,6 +445,7 @@ async fn radio_process(
                         let v = GenlMAC::parse_with_param(&msg.payload, msg.header);
                         // dbg!(&v);
                         // println!("{:?}", &v);
+                        // println!("{}", msg.payload.len());
                         match v {
                             Ok(frame) => {
                                 if frame.cmd != HwsimCmd::Frame {
@@ -281,13 +453,33 @@ async fn radio_process(
                                     continue;
                                 }
 
-                                let data = parse_genl_message::<GenlFrameTX>(frame);
+                                println!("{:?}", &frame.nlas);
 
+                                let genl_data = parse_genl_message::<GenlFrameTX>(frame);
+
+
+                                let data;
+
+                                match radio_info.sm_buffer.parse_data(&mmap, genl_data.shared_memory_pointer as usize) {
+                                    Ok(v) => data = v,
+                                    Err(_) => {
+                                        println!("fail to parse");
+                                        continue;
+                                    },
+                                }
+
+                                // println!("{}: {}", &id, &genl_data.shared_memory_pointer);
+
+                                // println!("len: {}", len);
+                                // print_hex(&mmap, po + 4, len.try_into().unwrap());
+
+                                // let data = parse_genl_message::<GenlFrameTX>(GenlMAC { cmd: HwsimCmd::Frame, nlas: raw_data });
+                                // println!("{:?}", data);
                                 if data.frame.header.addr1.eq(&[255, 255, 255, 255, 255, 255])
                                     || data.frame.header.addr1.eq(&[0, 0, 0, 0, 0, 0]) {
                                     txs.iter().for_each(|tx| {
 
-                                        let result = tx.tx.send(data.clone());
+                                        let result = tx.tx.send(*data.clone());
                                         match result {
                                             Ok(_) => {
                                                 // println!("mpsc send success");
@@ -301,7 +493,7 @@ async fn radio_process(
                                     for tx in &txs {
                                         if tx.mac.addr.eq(&data.frame.header.addr1) {
                                             assert!(&tx.mac.hw_addr.ne(&radio_info.radio.perm_addr));
-                                            let result = tx.tx.send(data.clone());
+                                            let result = tx.tx.send(*data.clone());
                                             match result {
                                                 Ok(_) => {},
                                                 Err(_) => {
@@ -329,25 +521,30 @@ async fn radio_process(
 
                 let signal = (30 - 91) as u32;
 
-                let mut frame_rx = GenlFrameRX::default();
+                let mut frame_rx_data = GenlFrameRX::default();
                 let mut tx_info_frame = GenlTXInfoFrame::default();
                 tx_info_frame.addr_transmitter = msg.addr_transmitter;
                 tx_info_frame.flags = msg.flags;
-                frame_rx.rx_rate = msg.tx_info[0].idx as u32;
-                frame_rx.signal = signal;
+                frame_rx_data.rx_rate = msg.tx_info[0].idx as u32;
+                frame_rx_data.signal = signal;
                 tx_info_frame.tx_info = msg.tx_info;
                 tx_info_frame.cookie = msg.cookie;
-                frame_rx.freq = msg.freq;
-                frame_rx.frame = msg.frame;
-                frame_rx.addr_receiver = radio_info.radio.perm_addr.clone();
+                frame_rx_data.freq = msg.freq;
+                frame_rx_data.frame = msg.frame;
+                frame_rx_data.addr_receiver = radio_info.radio.perm_addr.clone();
+
+                let pointer = radio_info.sm_buffer.emit_data(&mut mmap, frame_rx_data);
+
+                let mut frame_rx_nl = GenlFrameRX::default();
+
+                frame_rx_nl.shared_memory_pointer = pointer as u64;
 
 
                 // println!("{:?}", &frame_rx.addr_receiver);
                 // println!("{:?}", &tx_info_frame.addr_transmitter);
                 // assert!(&frame_rx.addr_receiver.ne(&tx_info_frame.addr_transmitter));
 
-
-                match handle.notify(frame_rx.generate_genl_message()).await {
+                match handle.notify(frame_rx_nl.generate_genl_message()).await {
                     Ok(_) => {
                         // println!("handle 1 frame rx");
 

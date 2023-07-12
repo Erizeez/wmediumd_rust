@@ -26,7 +26,8 @@ pub const HWSIM_ATTR_TX_INFO_FLAGS: u16 = 21;
 pub const HWSIM_ATTR_PERM_ADDR: u16 = 22;
 pub const HWSIM_ATTR_IFTYPE_SUPPORT: u16 = 23;
 pub const HWSIM_ATTR_CIPHER_SUPPORT: u16 = 24;
-pub const HWSIM_ATTR_SM_PAGE_NUM: u16 = 25;
+pub const HWSIM_ATTR_SM_POINTER: u16 = 25;
+pub const HWSIM_ATTR_SM_PAGE_NUM: u16 = 26;
 
 pub const HWSIM_CMD_REGISTER: u8 = 1;
 pub const HWSIM_CMD_FRAME: u8 = 2;

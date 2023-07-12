@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/src/linux-headers-5.15.0-76-generic",
+                "/usr/src/linux-headers-5.15.0-76/include",
+                "/usr/src/linux-headers-5.15.0-76/arch/arm64/include",
+                "/usr/src/linux-headers-5.15.0-76/arch/arm/include",
+                "/usr/src/linux-headers-5.15.0-76-generic/arch/arm64/include/generated",
+                "/usr/src/linux-headers-5.15.0-76-generic/include",
+                "${workspaceFolder}/driver/lib"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-arm64"
+        }
+    ],
+    "version": 4
+}

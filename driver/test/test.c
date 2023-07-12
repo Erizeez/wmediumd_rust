@@ -4,8 +4,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#define DEV_NAME "/dev/phy14"
-#define MEM_SIZE 4096 * 64
+#define DEV_NAME "/dev/link1_node1"
+#define MEM_SIZE 4096 * 256
 
 int main()
 {
@@ -29,13 +29,13 @@ int main()
         exit(1);
     }
 
-    printf("Read from mmap: %s\n", mem);
+    printf("Read from mmap: %d\n", *(mem + 4096 * 256 - 1));
 
     // // 将字符串 "Hello, mmap!" 写入设备内存
     // snprintf(mem, 12, "Hello, mmap!");
 
     // 输出读取到的映射内存内容
-    printf("Read from mmap: %s\n", mem);
+    // printf("Read from mmap: %s\n", mem);
 
     // 解除内存映射
     ret = munmap(mem, MEM_SIZE);

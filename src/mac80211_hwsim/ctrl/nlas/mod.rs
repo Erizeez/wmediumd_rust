@@ -43,6 +43,8 @@ pub enum HwsimAttrs {
     PermAddr(MACAddress),
     IftypeSupport(u32),
     CipherSupport(Vec<u32>),
+    SharedMemoryPointer(u64),
+    SharedMemoryPageNum(u32),
 }
 
 impl Nla for HwsimAttrs {
@@ -74,6 +76,8 @@ impl Nla for HwsimAttrs {
             PermAddr(v) => size_of_val(v),
             IftypeSupport(v) => size_of_val(v),
             CipherSupport(v) => size_of_val(v),
+            SharedMemoryPointer(v) => size_of_val(v),
+            SharedMemoryPageNum(v) => size_of_val(v),
         }
     }
 
@@ -105,6 +109,8 @@ impl Nla for HwsimAttrs {
             PermAddr(_) => HWSIM_ATTR_PERM_ADDR,
             IftypeSupport(_) => HWSIM_ATTR_IFTYPE_SUPPORT,
             CipherSupport(_) => HWSIM_ATTR_CIPHER_SUPPORT,
+            SharedMemoryPointer(_) => HWSIM_ATTR_SM_POINTER,
+            SharedMemoryPageNum(_) => HWSIM_ATTR_SM_PAGE_NUM,
         }
     }
 
@@ -156,6 +162,8 @@ impl Nla for HwsimAttrs {
                     NativeEndian::write_u32(buffer, *vv);
                 }
             }
+            SharedMemoryPointer(v) => NativeEndian::write_u64(buffer, *v),
+            SharedMemoryPageNum(v) => NativeEndian::write_u32(buffer, *v),
         }
     }
 }
@@ -246,7 +254,12 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for HwsimAttrs {
             HWSIM_ATTR_PERM_ADDR => {
                 Self::PermAddr(parse_mac(payload).context("failed to parse HWSIM_ATTR_PERM_ADDR")?)
             }
-            kind => return Err(DecodeError::from(format!("Unknown NLA type: {kind}"))),
+            HWSIM_ATTR_SM_POINTER => Self::SharedMemoryPointer(parse_u64(payload)?),
+            HWSIM_ATTR_SM_PAGE_NUM => Self::SharedMemoryPageNum(parse_u32(payload)?),
+            kind => {
+                // println!("Unknown NLA type: {kind}");
+                return Err(DecodeError::from(format!("Unknown NLA type: {kind}")));
+            }
         })
     }
 }
