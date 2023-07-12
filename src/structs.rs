@@ -98,12 +98,11 @@ impl TryInto<GenlMAC> for GenlFrameRX {
 
         use HwsimAttrs::*;
 
-        // nlas.push(AddrReceiver(self.addr_receiver));
-        // nlas.push(Frame(self.frame.clone()));
-        // nlas.push(RXRate(self.rx_rate));
-        // nlas.push(Signal(self.signal));
-        // nlas.push(Freq(self.freq));
-        nlas.push(SharedMemoryPointer(self.shared_memory_pointer));
+        nlas.push(AddrReceiver(self.addr_receiver));
+        nlas.push(Frame(self.frame.clone()));
+        nlas.push(RXRate(self.rx_rate));
+        nlas.push(Signal(self.signal));
+        nlas.push(Freq(self.freq));
 
         Ok(GenlMAC {
             cmd: HwsimCmd::Frame,
@@ -122,10 +121,11 @@ impl GenlAutoConstruct for GenlFrameRX {
         use HwsimAttrs::*;
 
         nlas.push(AddrReceiver(self.addr_receiver));
-        nlas.push(Frame(self.frame.clone()));
-        nlas.push(RXRate(self.rx_rate));
-        nlas.push(Signal(self.signal));
-        nlas.push(Freq(self.freq));
+        // nlas.push(Frame(self.frame.clone()));
+        // nlas.push(RXRate(self.rx_rate));
+        // nlas.push(Signal(self.signal));
+        // nlas.push(Freq(self.freq));
+        nlas.push(SharedMemoryPointer(self.shared_memory_pointer));
 
         NetlinkMessage::new(
             nl_hdr,

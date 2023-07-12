@@ -57,8 +57,8 @@ mod mac80211_hwsim;
 mod structs;
 
 pub const MAX_PAGE_NUM_PER_RADIO: usize = 64;
-pub const MAX_PAGE_ORDER_PER_RADIO: usize = 11;
-pub const DEFAULT_PAGE_ORDER_PER_RADIO: usize = 10;
+pub const MAX_PAGE_ORDER_PER_RADIO: usize = 15;
+pub const DEFAULT_PAGE_ORDER_PER_RADIO: usize = 4;
 pub const PAGE_SHIFT: usize = 12;
 pub const PAGE_SIZE: usize = 1 << PAGE_SHIFT;
 
@@ -92,6 +92,8 @@ impl SharedMemoryBuffer {
         let l = self.rx_offset + pointer;
         let r = self.rx_offset + (pointer + len) % self.rx_size;
 
+        // println!("{}", len);
+
         if l > r {
             boxed_slice[0..(self.rx_size - pointer)]
                 .copy_from_slice(&buffer[l..(self.rx_offset + self.rx_size)]);
@@ -106,6 +108,10 @@ impl SharedMemoryBuffer {
     fn parse_data(&self, buffer: &[u8], pointer: usize) -> Result<Box<GenlFrameTX>, Error> {
         let (length_slice, new_pointer) = self.read_data_from_pointer_by_len(buffer, pointer, 4);
         let length = parse_u32(&length_slice).expect("cannot parse length");
+
+        if length > PAGE_SIZE as u32 {
+            return Err(anyhow::anyhow!("Len invalid"));
+        }
 
         let (raw_data, _) =
             self.read_data_from_pointer_by_len(buffer, new_pointer, length as usize);
@@ -138,7 +144,7 @@ impl SharedMemoryBuffer {
             shared_memory[l..r].copy_from_slice(buffer);
         }
 
-        self.tx_end += len;
+        self.tx_end = (self.tx_end + len) % self.tx_size;
 
         r - self.tx_offset
     }
@@ -156,7 +162,7 @@ impl SharedMemoryBuffer {
         NativeEndian::write_u32(&mut length_buffer, length as u32);
 
         self.write_data_to_pointer_by_len(shared_memory, &length_buffer, 4);
-        self.write_data_to_pointer_by_len(shared_memory, &raw_data, raw_data.len());
+        self.write_data_to_pointer_by_len(shared_memory, &raw_data, length);
 
         tx_end
     }
@@ -212,7 +218,8 @@ async fn main() {
 
         let mut sm_buffer = SharedMemoryBuffer::default();
         sm_buffer.page_order = DEFAULT_PAGE_ORDER_PER_RADIO;
-        sm_buffer.page_size = 2 << DEFAULT_PAGE_ORDER_PER_RADIO;
+        sm_buffer.page_size = 1 << DEFAULT_PAGE_ORDER_PER_RADIO;
+
         sm_buffer.rx_page_offset = 0;
         sm_buffer.rx_page_size = sm_buffer.page_size / 2;
         sm_buffer.rx_offset = sm_buffer.rx_page_offset << PAGE_SHIFT;
@@ -261,9 +268,9 @@ async fn main() {
                     });
                 }
             });
-            println!("{}", id);
-            println!("{:?}", &txs);
-            println!("{:?}", &radio_info);
+            // println!("{}", id);
+            // println!("{:?}", &txs);
+            // println!("{:?}", &radio_info);
 
             tokio::spawn(radio_process(
                 *id,
@@ -420,7 +427,7 @@ async fn radio_process(
     // file.set_len((2 << DEFAULT_PAGE_ORDER_PER_RADIO) * 4096)
     //     .await
     //     .expect("Failed to set len");
-    println!("{}", radio_info.sm_buffer.page_size as usize);
+    // println!("{}", radio_info.sm_buffer.page_size as usize);
     let mut mmap = unsafe {
         // MmapMut::map_mut(&file).expect("Failed to mmap")
         MmapOptions::new()
@@ -453,7 +460,7 @@ async fn radio_process(
                                     continue;
                                 }
 
-                                println!("{:?}", &frame.nlas);
+                                // println!("{:?}", &frame.nlas);
 
                                 let genl_data = parse_genl_message::<GenlFrameTX>(frame);
 
@@ -538,6 +545,7 @@ async fn radio_process(
                 let mut frame_rx_nl = GenlFrameRX::default();
 
                 frame_rx_nl.shared_memory_pointer = pointer as u64;
+                frame_rx_nl.addr_receiver = radio_info.radio.perm_addr.clone();
 
 
                 // println!("{:?}", &frame_rx.addr_receiver);

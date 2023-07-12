@@ -47,10 +47,10 @@
 
 #define WARN_QUEUE 100
 #define MAX_QUEUE 200
-// 4096 pages
-#define MAX_PAGE_ORDER_PER_RADIO 11
 // 2048 pages
-#define DEFAULT_PAGE_ORDER_PER_RADIO 10
+#define MAX_PAGE_ORDER_PER_RADIO 15
+// 1024 pages
+#define DEFAULT_PAGE_ORDER_PER_RADIO 4
 
 MODULE_AUTHOR("Jouni Malinen");
 MODULE_DESCRIPTION("Software simulator of 802.11 radio(s) for mac80211");
@@ -75,6 +75,75 @@ MODULE_PARM_DESC(rctbl, "Handle rate control table");
 static bool support_p2p_device = true;
 module_param(support_p2p_device, bool, 0444);
 MODULE_PARM_DESC(support_p2p_device, "Support P2P-Device interface type");
+
+static inline int tlv_parse(const struct nlattr *head, int len,
+							struct nlattr *tb[], int maxtype)
+{
+	const struct nlattr *nla;
+	int rem;
+	// size_t i;
+	// char *hex_str;
+	// char *current_p;
+
+	// const unsigned char *p = (const unsigned char *)head;
+
+	// hex_str = kmalloc(len * 3 + 1, GFP_KERNEL);
+	// current_p = hex_str;
+	// for (i = 0; i < len; ++i)
+	// {
+	// 	snprintf(current_p, 3, "%02X", p[i]);
+	// 	current_p += 2;
+	// 	*current_p = ' ';
+	// 	current_p++;
+	// }
+	// *current_p = '\0';
+	// printk(KERN_INFO "%s\n", hex_str);
+	// kfree(hex_str);
+
+	if (tb)
+		memset(tb, 0, sizeof(struct nlattr *) * (maxtype + 1));
+
+	nla_for_each_attr(nla, head, len, rem)
+	{
+		u16 type = nla_type(nla);
+
+		if (type == 0 || type > maxtype)
+		{
+			return -1;
+		}
+
+		if (tb)
+			tb[type] = (struct nlattr *)nla;
+	}
+
+	return 0;
+}
+
+static struct nlattr **
+tlv_attrs_parse(
+	const struct nlattr *head,
+	int len)
+{
+	struct nlattr **attrbuf;
+	int err;
+
+	attrbuf = kmalloc_array(HWSIM_ATTR_MAX + 1,
+							sizeof(struct nlattr *), GFP_ATOMIC);
+	if (!attrbuf)
+	{
+		printk(KERN_ERR "attrbuf kmalloc_array fail");
+		return NULL;
+	}
+
+	err = tlv_parse(head, len, attrbuf, HWSIM_ATTR_MAX);
+	if (err != 0)
+	{
+		kfree(attrbuf);
+		printk(KERN_ERR "hwsim_nlmsg_parse fail");
+		return NULL;
+	}
+	return attrbuf;
+}
 
 // sm_device
 
@@ -148,7 +217,7 @@ void write_data_to_tx_end_by_len(struct sm_buffer *sm_buffer, unsigned long tx_e
 	__write_data_to_tx_end_by_len(sm_buffer, new_tx_end, data, len);
 }
 
-unsigned long __read_data_to_tx_end_by_len(struct sm_buffer *sm_buffer, unsigned long rx_end, char *data, unsigned long len)
+unsigned long __read_data_from_pointer_by_len(struct sm_buffer *sm_buffer, unsigned long rx_end, char *data, unsigned long len)
 {
 	unsigned long rem = len;
 	unsigned long page_idx = rx_end >> PAGE_SHIFT;
@@ -175,13 +244,41 @@ unsigned long __read_data_to_tx_end_by_len(struct sm_buffer *sm_buffer, unsigned
 	return new_rx_end;
 }
 
-unsigned long read_data_to_tx_end_by_len(struct sm_buffer *sm_buffer, unsigned long rx_end, char *data)
+struct nlattr **read_data_from_pointer(struct sm_buffer *sm_buffer, unsigned long rx_end, char *data)
 {
-	unsigned long len;
-	unsigned long new_rx_end = __read_data_to_tx_end_by_len(sm_buffer, rx_end, (char *)&len, 4);
-	// data = kmalloc(len, GFP_ATOMIC);
-	// __read_data_to_tx_end_by_len(sm_buffer, new_rx_end, data, len);
-	return len;
+	unsigned long len = 0;
+	char *len_buffer = kmalloc(4, GFP_ATOMIC);
+	unsigned long new_rx_end = __read_data_from_pointer_by_len(sm_buffer, rx_end, len_buffer, 4);
+	// char *data;
+	struct nlattr **my_info;
+
+	len |= len_buffer[0];
+	len |= len_buffer[1] << 8;
+	len |= len_buffer[2] << 16;
+	len |= len_buffer[3] << 24;
+
+	if (len > PAGE_SIZE)
+	{
+		return NULL;
+	}
+	// printk(KERN_INFO "recv len: %ld", len);
+
+	data = kmalloc(len, GFP_ATOMIC);
+	__read_data_from_pointer_by_len(sm_buffer, new_rx_end, data, len);
+
+	my_info = tlv_attrs_parse((const struct nlattr *)data, (int)len);
+	// if (my_info && my_info[HWSIM_ATTR_COOKIE])
+	// {
+	// 	printk(KERN_INFO "Cookie -------- %lld", nla_get_u64(my_info[HWSIM_ATTR_COOKIE]));
+	// }
+	// else
+	// {
+	// 	printk(KERN_INFO "parse error");
+	// }
+
+	// kfree(data);
+
+	return my_info;
 }
 
 LIST_HEAD(sm_buffer_head);
@@ -231,7 +328,7 @@ static int mydev_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	if (vm_page_size > entry->page_size)
 	{
-		printk(KERN_ERR "mac80211_hwsim: mmap size too large\n");
+		printk(KERN_ERR "mac80211_hwsim: mmap size too large. Want %ld. Remain %ld\n", vm_page_size, entry->page_size);
 		return -EIO;
 	}
 
@@ -1516,75 +1613,6 @@ static inline void print_hex(const unsigned char *head, int len)
 	kfree(hex_str);
 }
 
-static inline int tlv_parse(const struct nlattr *head, int len,
-							struct nlattr *tb[], int maxtype)
-{
-	const struct nlattr *nla;
-	int rem;
-	// size_t i;
-	// char *hex_str;
-	// char *current_p;
-
-	// const unsigned char *p = (const unsigned char *)head;
-
-	// hex_str = kmalloc(len * 3 + 1, GFP_KERNEL);
-	// current_p = hex_str;
-	// for (i = 0; i < len; ++i)
-	// {
-	// 	snprintf(current_p, 3, "%02X", p[i]);
-	// 	current_p += 2;
-	// 	*current_p = ' ';
-	// 	current_p++;
-	// }
-	// *current_p = '\0';
-	// printk(KERN_INFO "%s\n", hex_str);
-	// kfree(hex_str);
-
-	if (tb)
-		memset(tb, 0, sizeof(struct nlattr *) * (maxtype + 1));
-
-	nla_for_each_attr(nla, head, len, rem)
-	{
-		u16 type = nla_type(nla);
-
-		if (type == 0 || type > maxtype)
-		{
-			return -1;
-		}
-
-		if (tb)
-			tb[type] = (struct nlattr *)nla;
-	}
-
-	return 0;
-}
-
-static struct nlattr **
-tlv_attrs_parse(
-	const struct nlattr *head,
-	int len)
-{
-	struct nlattr **attrbuf;
-	int err;
-
-	attrbuf = kmalloc_array(HWSIM_ATTR_MAX + 1,
-							sizeof(struct nlattr *), GFP_ATOMIC);
-	if (!attrbuf)
-	{
-		printk(KERN_ERR "attrbuf kmalloc_array fail");
-		return NULL;
-	}
-
-	err = tlv_parse(head, len, attrbuf, HWSIM_ATTR_MAX);
-	if (err)
-	{
-		kfree(attrbuf);
-		printk(KERN_ERR "hwsim_nlmsg_parse fail");
-		return NULL;
-	}
-	return attrbuf;
-}
-
 static void mac80211_hwsim_tx_frame_nl(struct ieee80211_hw *hw,
 									   struct sk_buff *my_skb,
 									   int dst_portid,
@@ -1603,7 +1631,6 @@ static void mac80211_hwsim_tx_frame_nl(struct ieee80211_hw *hw,
 	struct hwsim_tx_rate_flag tx_attempts_flags[IEEE80211_TX_MAX_RATES];
 	uintptr_t cookie;
 	unsigned long tx_pointer;
-	unsigned long mask = (1 << PAGE_SHIFT) - 1;
 
 	if (data->ps != PS_DISABLED)
 		hdr->frame_control |= cpu_to_le16(IEEE80211_FCTL_PM);
@@ -3481,7 +3508,6 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 	struct miscdevice *sm_device;
 	int ret = -ENOMEM;
 	struct sm_buffer *vm_buffer_elem;
-	struct page *page;
 
 	if (WARN_ON(param->channels > 1 && !param->use_chanctx))
 		return -EINVAL;
@@ -3898,7 +3924,7 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 
 	vm_buffer_elem->page_order = param->sm_page_order;
 
-	vm_buffer_elem->page_size = 2 << param->sm_page_order;
+	vm_buffer_elem->page_size = 1 << param->sm_page_order;
 
 	vm_buffer_elem->tx_page_offset = 0;
 	vm_buffer_elem->tx_page_size = vm_buffer_elem->page_size / 2;
@@ -3913,7 +3939,7 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 	spin_lock_init(&vm_buffer_elem->lock);
 
 	// Allocate pages
-	vm_buffer_elem->page = alloc_pages(GFP_ATOMIC, param->sm_page_order);
+	vm_buffer_elem->page = alloc_pages(GFP_KERNEL, param->sm_page_order);
 	if (!vm_buffer_elem->page)
 	{
 		printk(KERN_ERR "mac80211_hwsim: failed to allocate pages\n");
@@ -3965,7 +3991,7 @@ failed_bind:
 failed_drvdata:
 	ieee80211_free_hw(hw);
 failed:
-	printk(KERN_ERR, "failed to add radio");
+	printk(KERN_ERR "failed to add radio");
 	return err;
 }
 
@@ -4009,7 +4035,7 @@ static void mac80211_hwsim_del_radio(struct mac80211_hwsim_data *data,
 									 struct genl_info *info)
 {
 	struct sm_buffer *entry;
-	unsigned long i, flags;
+	unsigned long flags;
 
 	hwsim_mcast_del_radio(data->idx, hwname, info);
 	debugfs_remove_recursive(data->debugfs);
@@ -4241,7 +4267,7 @@ out:
 }
 
 static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
-										  struct genl_info *info)
+										  struct genl_info *nl_info)
 {
 	struct mac80211_hwsim_data *data2;
 	struct ieee80211_rx_status rx_status;
@@ -4251,16 +4277,38 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 	void *frame_data;
 	struct sk_buff *skb = NULL;
 	struct ieee80211_channel *channel = NULL;
+	unsigned long sm_pointer;
+	struct nlattr **attrs;
+	char *sm_data;
 
-	if (!info->attrs[HWSIM_ATTR_ADDR_RECEIVER] ||
-		!info->attrs[HWSIM_ATTR_FRAME] ||
-		!info->attrs[HWSIM_ATTR_RX_RATE] ||
-		!info->attrs[HWSIM_ATTR_SIGNAL])
+	// Parse from memory
+	if (!nl_info->attrs[HWSIM_ATTR_SM_POINTER] ||
+		!nl_info->attrs[HWSIM_ATTR_ADDR_RECEIVER])
 		goto out;
 
-	dst = (void *)nla_data(info->attrs[HWSIM_ATTR_ADDR_RECEIVER]);
-	frame_data_len = nla_len(info->attrs[HWSIM_ATTR_FRAME]);
-	frame_data = (void *)nla_data(info->attrs[HWSIM_ATTR_FRAME]);
+	sm_pointer = nla_get_u64(nl_info->attrs[HWSIM_ATTR_SM_POINTER]);
+	if (!sm_pointer)
+		goto out;
+
+	dst = (void *)nla_data(nl_info->attrs[HWSIM_ATTR_ADDR_RECEIVER]);
+
+	data2 = get_hwsim_data_ref_from_addr(dst);
+	if (!data2)
+		goto out;
+
+	attrs = read_data_from_pointer(data2->sm_buffer, sm_pointer, sm_data);
+
+	if (!attrs ||
+		!attrs[HWSIM_ATTR_FRAME] ||
+		!attrs[HWSIM_ATTR_RX_RATE] ||
+		!attrs[HWSIM_ATTR_SIGNAL])
+	{
+		printk(KERN_ERR "msg abnormal");
+		goto out;
+	}
+
+	frame_data_len = nla_len(attrs[HWSIM_ATTR_FRAME]);
+	frame_data = (void *)nla_data(attrs[HWSIM_ATTR_FRAME]);
 
 	/* Allocate new skb here */
 	skb = alloc_skb(frame_data_len, GFP_KERNEL);
@@ -4272,10 +4320,6 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 
 	/* Copy the data */
 	skb_put_data(skb, frame_data, frame_data_len);
-
-	data2 = get_hwsim_data_ref_from_addr(dst);
-	if (!data2)
-		goto out;
 
 	if (data2->use_chanctx)
 	{
@@ -4293,11 +4337,11 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 
 	if (!hwsim_virtio_enabled)
 	{
-		if (hwsim_net_get_netgroup(genl_info_net(info)) !=
+		if (hwsim_net_get_netgroup(genl_info_net(nl_info)) !=
 			data2->netgroup)
 			goto out;
 
-		if (info->snd_portid != data2->wmediumd)
+		if (nl_info->snd_portid != data2->wmediumd)
 			goto out;
 	}
 
@@ -4308,14 +4352,14 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 
 	/* A frame is received from user space */
 	memset(&rx_status, 0, sizeof(rx_status));
-	if (info->attrs[HWSIM_ATTR_FREQ])
+	if (attrs[HWSIM_ATTR_FREQ])
 	{
 		/* throw away off-channel packets, but allow both the temporary
 		 * ("hw" scan/remain-on-channel) and regular channel, since the
 		 * internal datapath also allows this
 		 */
 		mutex_lock(&data2->mutex);
-		rx_status.freq = nla_get_u32(info->attrs[HWSIM_ATTR_FREQ]);
+		rx_status.freq = nla_get_u32(attrs[HWSIM_ATTR_FREQ]);
 
 		if (rx_status.freq != channel->center_freq)
 		{
@@ -4330,10 +4374,10 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 	}
 
 	rx_status.band = channel->band;
-	rx_status.rate_idx = nla_get_u32(info->attrs[HWSIM_ATTR_RX_RATE]);
+	rx_status.rate_idx = nla_get_u32(attrs[HWSIM_ATTR_RX_RATE]);
 	if (rx_status.rate_idx >= data2->hw->wiphy->bands[rx_status.band]->n_bitrates)
 		goto out;
-	rx_status.signal = nla_get_u32(info->attrs[HWSIM_ATTR_SIGNAL]);
+	rx_status.signal = nla_get_u32(attrs[HWSIM_ATTR_SIGNAL]);
 
 	hdr = (void *)skb->data;
 
@@ -4346,6 +4390,8 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 	data2->rx_bytes += skb->len;
 	ieee80211_rx_irqsafe(data2->hw, skb);
 
+	kfree(attrs);
+	kfree(sm_data);
 	return 0;
 err:
 	pr_debug("mac80211_hwsim: error occurred in %s\n", __func__);
