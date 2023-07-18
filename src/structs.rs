@@ -36,6 +36,7 @@ pub struct GenlFrameTX {
     pub cookie: u64,
     pub freq: u32,
     pub tx_info_flags: [TXInfoFlag; IEEE80211_TX_MAX_RATES],
+    pub is_ack: bool,
 }
 
 impl GenlAutoConstruct for GenlFrameTX {

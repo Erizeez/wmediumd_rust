@@ -20,8 +20,9 @@ sudo ip netns exec wmediumd-net-2 ifconfig wlan0 192.168.1.2 up
 
 sleep 10
 
-nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-1 iperf3 -c 192.168.1.2 -t 60 -b 600M &
+# nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-1 iperf3 -c 192.168.1.2 -t 60 -b 600M &
 nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-2 iperf3 -s &
+nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-1 bash &
 # nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-3 iperf3 -c 192.168.2.2 -t 60 -b 600M &
 # nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-4 iperf3 -s &
 # nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-5 iperf3 -c 192.168.3.2 -t 60 -b 600M &

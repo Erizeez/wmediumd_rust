@@ -3,7 +3,7 @@
 # 定义函数，用于清除之前的修改
 function cleanup {
     sudo rmmod mac80211_hwsim
-    sudo modprobe -r mac80211_hwsim
+    sudo modprobe -r mac80211
 }
 
 # 注册清除函数，当脚本退出时自动执行

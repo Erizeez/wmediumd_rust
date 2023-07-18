@@ -3693,13 +3693,15 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 		!info->attrs[HWSIM_ATTR_TX_INFO])
 		goto out;
 
-	src = (void *)nla_data(info->attrs[HWSIM_ATTR_ADDR_TRANSMITTER]);
+	src = (u8 *)nla_data(info->attrs[HWSIM_ATTR_ADDR_TRANSMITTER]);
 	hwsim_flags = nla_get_u32(info->attrs[HWSIM_ATTR_FLAGS]);
 	ret_skb_cookie = nla_get_u64(info->attrs[HWSIM_ATTR_COOKIE]);
 
 	data2 = get_hwsim_data_ref_from_addr(src);
 	if (!data2)
 		goto out;
+
+	// printk(KERN_INFO "TX ", data2);
 
 	if (!hwsim_virtio_enabled)
 	{
@@ -3711,11 +3713,12 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 			goto out;
 	}
 
+	// printk(KERN_INFO "TX info recv");
+
 	/* look for the skb matching the cookie passed back from user */
 	spin_lock_irqsave(&data2->pending.lock, flags);
 	skb_queue_walk_safe(&data2->pending, skb, tmp)
 	{
-		// j++;
 		uintptr_t skb_cookie;
 
 		txi = IEEE80211_SKB_CB(skb);
@@ -3730,20 +3733,29 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	}
 	spin_unlock_irqrestore(&data2->pending.lock, flags);
 
+	// goto out;
+
 	/* not found */
 	if (!found)
+	{
+		printk(KERN_INFO "not found: %lld", ret_skb_cookie);
 		goto out;
+	}
 
-	printk(KERN_INFO "Found");
+	// goto out;
 
 	/* Tx info received because the frame was broadcasted on user space,
-	 so we get all the necessary info: tx attempts and skb control buff */
+ so we get all the necessary info: tx attempts and skb control buff */
 
 	tx_attempts = (struct hwsim_tx_rate *)nla_data(
 		info->attrs[HWSIM_ATTR_TX_INFO]);
 
+	// goto out;
+
 	/* now send back TX status */
 	txi = IEEE80211_SKB_CB(skb);
+
+	// goto out;
 
 	ieee80211_tx_info_clear_status(txi);
 
@@ -3754,6 +3766,11 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	}
 
 	txi->status.ack_signal = nla_get_u32(info->attrs[HWSIM_ATTR_SIGNAL]);
+
+	// printk(KERN_INFO "%d", !(hwsim_flags & HWSIM_TX_CTL_NO_ACK));
+	// printk(KERN_INFO "%d", (hwsim_flags & HWSIM_TX_STAT_ACK));
+
+	// goto out;
 
 	if (!(hwsim_flags & HWSIM_TX_CTL_NO_ACK) &&
 		(hwsim_flags & HWSIM_TX_STAT_ACK))
@@ -3770,10 +3787,11 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	if (hwsim_flags & HWSIM_TX_CTL_NO_ACK)
 		txi->flags |= IEEE80211_TX_STAT_NOACK_TRANSMITTED;
 
+	// goto out;
+
 	ieee80211_tx_status_irqsafe(data2->hw, skb);
 	return 0;
 out:
-	printk(KERN_ERR "EINVAL");
 	return -EINVAL;
 }
 

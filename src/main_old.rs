@@ -281,16 +281,10 @@ async fn radio_process(
                                     continue;
                                 }
 
-                                let mut data = parse_genl_message::<GenlFrameTX>(frame);
-                                data.is_ack = false;
+                                let data = parse_genl_message::<GenlFrameTX>(frame);
 
-                                // if (0x01 & data.frame.header.addr1[0]) != 0 {
-                                //     println!("Multicast: {:?} -- {}", &data.frame.header.addr1, data.frame.payload.len());
-                                // } else {
-                                //     println!("Unicast: {:?} -- {}", &data.frame.header.addr1, data.frame.payload.len());
-                                // }
-
-                                if (0x01 & data.frame.header.addr1[0]) != 0 {
+                                if data.frame.header.addr1.eq(&[255, 255, 255, 255, 255, 255])
+                                    || data.frame.header.addr1.eq(&[0, 0, 0, 0, 0, 0]) {
                                     txs.iter().for_each(|tx| {
 
                                         let result = tx.tx.send(data.clone());
@@ -331,87 +325,46 @@ async fn radio_process(
                     _ => {}
                 }
             }
-            Some(mut msg) = rx.recv() => {
-                let signal:i32 = 30 - 91;
-                // msg.flags = ((msg.flags as i32) | HWSIM_TX_STAT_ACK) as u32;
+            Some(msg) = rx.recv() => {
+
+                let signal = (30 - 91) as u32;
+
+                let mut frame_rx = GenlFrameRX::default();
+                let mut tx_info_frame = GenlTXInfoFrame::default();
+                tx_info_frame.addr_transmitter = msg.addr_transmitter;
+                tx_info_frame.flags = msg.flags;
+                frame_rx.rx_rate = msg.tx_info[0].idx as u32;
+                frame_rx.signal = signal;
+                tx_info_frame.tx_info = msg.tx_info;
+                tx_info_frame.cookie = msg.cookie;
+                frame_rx.freq = msg.freq;
+                frame_rx.frame = msg.frame;
+                frame_rx.addr_receiver = radio_info.radio.perm_addr.clone();
 
 
-                if msg.is_ack {
-                    msg.flags = 6;
-                    msg.tx_info[0].idx = 0;
-                    msg.tx_info[0].count = 1;
-                    msg.tx_info[1].idx = -1;
-                    msg.tx_info[1].count = 255;
-                    msg.tx_info[2].idx = -1;
-                    msg.tx_info[2].count = 255;
-                    msg.tx_info[3].idx = -1;
-                    msg.tx_info[3].count = 255;
+                // println!("{:?}", &frame_rx.addr_receiver);
+                // println!("{:?}", &tx_info_frame.addr_transmitter);
+                // assert!(&frame_rx.addr_receiver.ne(&tx_info_frame.addr_transmitter));
 
 
-                    let mut tx_info_frame = GenlTXInfoFrame::default();
-                    tx_info_frame.addr_transmitter = msg.addr_transmitter;
-                    tx_info_frame.flags = msg.flags;
-                    tx_info_frame.tx_info = msg.tx_info;
-                    tx_info_frame.cookie = msg.cookie;
-                    tx_info_frame.signal = signal as u32;
+                match handle.notify(frame_rx.generate_genl_message()).await {
+                    Ok(_) => {
+                        // println!("handle 1 frame rx");
 
-                    // println!("{:?}", &tx_info_frame);
-
-                    match handle.notify(tx_info_frame.generate_genl_message()).await {
-                        Ok(_) => {
-                            // println!("handle 1 frame tx info");
-
-                        }
-                        Err(_) => {
-                            println!("fail frame tx info");
-                        }
                     }
-                } else {
-                    let mut frame_rx = GenlFrameRX::default();
-
-                    // frame_rx.rx_rate = msg.tx_info[0].idx as u32;
-                    frame_rx.rx_rate = 0;
-                    frame_rx.signal = signal as u32;
-                    frame_rx.freq = msg.freq;
-                    frame_rx.frame = msg.frame.clone();
-                    frame_rx.addr_receiver = radio_info.radio.perm_addr.clone();
-
-
-                    // println!("{:?}", &frame_rx.addr_receiver);
-                    // println!("{:?}", &tx_info_frame.addr_transmitter);
-                    // assert!(&frame_rx.addr_receiver.ne(&tx_info_frame.addr_transmitter));
-
-
-                    match handle.notify(frame_rx.generate_genl_message()).await {
-                        Ok(_) => {
-                            // println!("handle 1 frame rx");
-
-                        }
-                        Err(_) => {
-                            println!("fail frame rx");
-                        }
+                    Err(_) => {
+                        println!("fail frame rx");
                     }
+                }
 
-                    if !is_multicast_ether_addr(msg.frame.header.addr1) && !frame_is_mgmt(msg.frame.header.frame_control) {
-                        msg.is_ack = true;
-                        // println!("{:?}", &msg.frame.header.addr1);
+                match handle.notify(tx_info_frame.generate_genl_message()).await {
+                    Ok(_) => {
+                        // println!("handle 1 frame tx info");
 
-                        for tx in &txs {
-                            if tx.mac.addr.eq(&msg.frame.header.addr2) {
-                                assert!(&tx.mac.hw_addr.ne(&radio_info.radio.perm_addr));
-                                let result = tx.tx.send(msg.clone());
-                                match result {
-                                    Ok(_) => {},
-                                    Err(_) => {
-                                        println!("mpsc send fail");
-                                    },
-                                }
-                                break;
-                            }
-                        }
                     }
-
-
+                    Err(_) => {
+                        println!("fail frame tx info");
+                    }
                 }
             }
             _ = terminate_rx.recv() => {
@@ -429,15 +382,4 @@ async fn radio_process(
             }
         }
     }
-}
-
-const FCTL_FTYPE: u8 = 0x0c;
-const FTYPE_MGMT: u8 = 0x00;
-const HWSIM_TX_STAT_ACK: i32 = 1 << 2;
-fn frame_is_mgmt(frame_control: [u8; 2]) -> bool {
-    (frame_control[0] & FCTL_FTYPE) == FTYPE_MGMT
-}
-
-fn is_multicast_ether_addr(addr: [u8; ETH_ALEN]) -> bool {
-    (0x01 & addr[0]) != 0
 }

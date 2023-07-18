@@ -1,5 +1,5 @@
 
-nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-2 iperf3 -s &
+nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-2 bash &
 # nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-4 iperf3 -s &
 # nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-6 iperf3 -s &
 # nohup gnome-terminal --disable-factory -- sudo ip netns exec wmediumd-net-8 iperf3 -s &
