@@ -3801,15 +3801,15 @@ static int hwsim_rx_nl(struct sk_buff *skb_2,
 
 	// printk(KERN_INFO "TX ", data2);
 
-	// if (!hwsim_virtio_enabled)
-	// {
-	// 	if (hwsim_net_get_netgroup(genl_info_net(info)) !=
-	// 		data2->netgroup)
-	// 		goto out;
+	if (!hwsim_virtio_enabled)
+	{
+		if (hwsim_net_get_netgroup(genl_info_net(info)) !=
+			data2->netgroup)
+			goto out;
 
-	// 	if (info->snd_portid != data2->wmediumd)
-	// 		goto out;
-	// }
+		if (info->snd_portid != data2->wmediumd)
+			goto out;
+	}
 
 	// printk(KERN_INFO "TX info recv");
 	// goto out;
@@ -3818,10 +3818,10 @@ static int hwsim_rx_nl(struct sk_buff *skb_2,
 	spin_lock_irqsave(&data2->pending.lock, flags);
 	skb_queue_walk_safe(&data2->pending, skb, tmp)
 	{
-		uintptr_t skb_cookie;
+		u64 skb_cookie;
 
 		txi = IEEE80211_SKB_CB(skb);
-		skb_cookie = (uintptr_t)txi->rate_driver_data[0];
+		skb_cookie = (u64)(uintptr_t)txi->rate_driver_data[0];
 
 		if (skb_cookie == ret_skb_cookie)
 		{

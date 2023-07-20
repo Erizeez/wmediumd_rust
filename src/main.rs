@@ -65,19 +65,19 @@ async fn main() {
     let args: Vec<String> = env::args().collect();
 
     // 检查参数数量
-    if args.len() < 2 {
-        println!("请提供一个整数作为参数");
-        return;
-    }
+    // if args.len() < 2 {
+    //     println!("请提供一个整数作为参数");
+    //     return;
+    // }
 
     // 解析参数为整数
-    let node_id: i32 = match args[1].parse() {
-        Ok(n) => n,
-        Err(_) => {
-            println!("参数不是有效的整数");
-            return;
-        }
-    };
+    // let node_id: i32 = match args[1].parse() {
+    //     Ok(n) => n,
+    //     Err(_) => {
+    //         println!("参数不是有效的整数");
+    //         return;
+    //     }
+    // };
 
     let config_path = "./config/topology.yaml";
     let config = load_config(config_path);
@@ -181,21 +181,6 @@ macro_rules! netns_name {
     };
 }
 
-macro_rules! radio_name {
-    ($netns:expr, $id:literal) => {
-        format!("radio-{}-{}", $netns, $id)
-    };
-}
-
-macro_rules! mac_array {
-    ($netns:expr, $id:literal) => {{
-        let mut arr: [u8; 6] = [0x66, 0x0, 0x0, 0x0, 0x0, 0x0];
-        arr[4] = $netns;
-        arr[5] = $id;
-        arr
-    }};
-}
-
 async fn radio_process(
     id: usize,
     radio_info: RadioInfo,
@@ -259,21 +244,12 @@ async fn radio_process(
     new_radio_nl(&mut handle, new_radio).await;
 
     loop {
-        // let ns = get_from_current_thread().unwrap();
-        // println!("{:?}", ns.file().metadata());
-        // println!("{}, {:?}", id, get_from_current_thread().unwrap());
         tokio::select! {
-            // _ = tokio::time::sleep(Duration::from_secs(1)) => {
-            //     // 执行任务逻辑
-            //     println!("Long running task {} is running...", id);
-            // }
             Some(msg) = receiver.next() => {
                 let msg = msg.0;
                 match msg.payload {
                     netlink_packet_core::NetlinkPayload::InnerMessage(msg) => {
                         let v = GenlMAC::parse_with_param(&msg.payload, msg.header);
-                        // dbg!(&v);
-                        // println!("{:?}", &v);
                         match v {
                             Ok(frame) => {
                                 if frame.cmd != HwsimCmd::Frame {
@@ -282,13 +258,6 @@ async fn radio_process(
                                 }
 
                                 let mut data = parse_genl_message::<GenlFrameTX>(frame);
-                                data.is_ack = false;
-
-                                // if (0x01 & data.frame.header.addr1[0]) != 0 {
-                                //     println!("Multicast: {:?} -- {}", &data.frame.header.addr1, data.frame.payload.len());
-                                // } else {
-                                //     println!("Unicast: {:?} -- {}", &data.frame.header.addr1, data.frame.payload.len());
-                                // }
 
                                 if (0x01 & data.frame.header.addr1[0]) != 0 {
                                     txs.iter().for_each(|tx| {
@@ -306,7 +275,6 @@ async fn radio_process(
                                 } else {
                                     for tx in &txs {
                                         if tx.mac.addr.eq(&data.frame.header.addr1) {
-                                            assert!(&tx.mac.hw_addr.ne(&radio_info.radio.perm_addr));
                                             let result = tx.tx.send(data.clone());
                                             match result {
                                                 Ok(_) => {},
@@ -318,11 +286,6 @@ async fn radio_process(
                                         }
                                     }
                                 }
-                                // println!("1");
-                                // println!("{} -- {:?}", id, data.frame_header.addr1);
-
-
-                                // println!("{:?}", &rx_info);
 
                             }
                             Err(_) => {}
@@ -331,95 +294,29 @@ async fn radio_process(
                     _ => {}
                 }
             }
-            Some(mut msg) = rx.recv() => {
+            Some(msg) = rx.recv() => {
                 let signal:i32 = 30 - 91;
-                // msg.flags = ((msg.flags as i32) | HWSIM_TX_STAT_ACK) as u32;
 
+                let mut frame_rx = GenlTXInfoFrame::default();
 
-                if msg.is_ack {
-                    // msg.flags = 6;
-                    // msg.tx_info[0].idx = 0;
-                    // msg.tx_info[0].count = 1;
-                    // msg.tx_info[1].idx = -1;
-                    // msg.tx_info[1].count = 255;
-                    // msg.tx_info[2].idx = -1;
-                    // msg.tx_info[2].count = 255;
-                    // msg.tx_info[3].idx = -1;
-                    // msg.tx_info[3].count = 255;
+                frame_rx.rx_rate = msg.tx_info[0].idx as u32;
+                frame_rx.signal = signal as u32;
+                frame_rx.freq = msg.freq;
+                frame_rx.addr_receiver = radio_info.radio.perm_addr.clone();
+                frame_rx.addr_transmitter = msg.addr_transmitter;
+                frame_rx.flags = msg.flags;
+                frame_rx.tx_info = msg.tx_info;
+                frame_rx.cookie = msg.cookie;
 
-
-                    // let mut tx_info_frame = GenlTXInfoFrame::default();
-                    // tx_info_frame.addr_transmitter = msg.addr_transmitter;
-                    // tx_info_frame.flags = msg.flags;
-                    // tx_info_frame.tx_info = msg.tx_info;
-                    // tx_info_frame.cookie = msg.cookie;
-                    // tx_info_frame.signal = signal as u32;
-
-                    // // if id == 1 {
-                    // //     println!("{:?}", &tx_info_frame.cookie);
-                    // // }
-
-                    // assert!(msg.addr_transmitter.eq(&radio_info.radio.perm_addr));
-
-                    // match handle.notify(tx_info_frame.generate_genl_message()).await {
-                    //     Ok(_) => {
-                    //         // println!("handle 1 frame tx info");
-
-                    //     }
-                    //     Err(_) => {
-                    //         println!("fail frame tx info: {:?}", tx_info_frame);
-                    //     }
-                    // }
-                } else {
-                    let mut frame_rx = GenlTXInfoFrame::default();
-
-                    frame_rx.rx_rate = msg.tx_info[0].idx as u32;
-                    // frame_rx.rx_rate = 0;
-                    frame_rx.signal = signal as u32;
-                    frame_rx.freq = msg.freq;
-                    frame_rx.addr_receiver = radio_info.radio.perm_addr.clone();
-                    frame_rx.addr_transmitter = msg.addr_transmitter;
-                    frame_rx.flags = msg.flags;
-                    frame_rx.tx_info = msg.tx_info;
-                    frame_rx.cookie = msg.cookie;
-
-
-                    // println!("{:?}", &frame_rx.addr_receiver);
-                    // println!("{:?}", &tx_info_frame.addr_transmitter);
-                    // assert!(&frame_rx.addr_receiver.ne(&tx_info_frame.addr_transmitter));
-
-
-                    match handle.notify(frame_rx.generate_genl_message()).await {
-                        Ok(_) => {
-                            // println!("handle 1 frame rx");
-
-                        }
-                        Err(_) => {
-                            println!("fail frame rx");
-                        }
+                match handle.notify(frame_rx.generate_genl_message()).await {
+                    Ok(_) => {
+                        // println!("handle 1 frame rx");
                     }
-
-                    // if !is_multicast_ether_addr(msg.frame.header.addr1) && !frame_is_mgmt(msg.frame.header.frame_control) {
-                        // msg.is_ack = true;
-                        // // println!("{:?}", &msg.frame.header.addr1);
-
-                        // for tx in &txs {
-                        //     if tx.mac.addr.eq(&msg.addr_transmitter) {
-                        //         // assert!(&tx.mac.hw_addr.ne(&radio_info.radio.perm_addr));
-                        //         let result = tx.tx.send(msg.clone());
-                        //         match result {
-                        //             Ok(_) => {},
-                        //             Err(_) => {
-                        //                 println!("mpsc send fail");
-                        //             },
-                        //         }
-                        //         break;
-                        //     }
-                        // }
-                    // }
-
-
+                    Err(_) => {
+                        println!("fail frame rx");
+                    }
                 }
+
             }
             _ = terminate_rx.recv() => {
                 // 接收到终止信号，退出循环
@@ -436,15 +333,4 @@ async fn radio_process(
             }
         }
     }
-}
-
-const FCTL_FTYPE: u8 = 0x0c;
-const FTYPE_MGMT: u8 = 0x00;
-const HWSIM_TX_STAT_ACK: i32 = 1 << 2;
-fn frame_is_mgmt(frame_control: [u8; 2]) -> bool {
-    (frame_control[0] & FCTL_FTYPE) == FTYPE_MGMT
-}
-
-fn is_multicast_ether_addr(addr: [u8; ETH_ALEN]) -> bool {
-    (0x01 & addr[0]) != 0
 }

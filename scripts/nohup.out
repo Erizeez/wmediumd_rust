@@ -2493,3 +2493,29 @@ Gdk-Message: 21:47:44.805: Error reading events from display: Broken pipe
 (process:208963): GLib-GIO-CRITICAL **: 13:30:25.492: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
 
 (process:208962): GLib-GIO-CRITICAL **: 13:30:25.496: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:236923): GLib-GIO-CRITICAL **: 16:57:27.964: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:236924): GLib-GIO-CRITICAL **: 16:57:27.964: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:244537): GLib-GIO-CRITICAL **: 17:06:28.964: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:244536): GLib-GIO-CRITICAL **: 17:06:28.964: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:235909): GLib-GIO-CRITICAL **: 17:31:22.089: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:235908): GLib-GIO-CRITICAL **: 17:31:22.090: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:235906): GLib-GIO-CRITICAL **: 17:31:22.091: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:235907): GLib-GIO-CRITICAL **: 17:31:22.091: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:260999): GLib-GIO-CRITICAL **: 17:32:09.307: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:261000): GLib-GIO-CRITICAL **: 17:32:09.307: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:260997): GLib-GIO-CRITICAL **: 17:32:09.307: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:261881): GLib-GIO-CRITICAL **: 17:32:09.311: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
+
+(process:260998): GLib-GIO-CRITICAL **: 17:32:09.313: g_subprocess_get_exit_status: assertion 'WIFEXITED (subprocess->status)' failed
