@@ -123,6 +123,9 @@ pub struct GenlTXInfoFrame {
     pub cookie: u64,
     pub signal: u32,
     pub tx_info: [TXInfo; IEEE80211_TX_MAX_RATES],
+    pub addr_receiver: MACAddress,
+    pub rx_rate: u32,
+    pub freq: u32,
 }
 
 impl GenlAutoConstruct for GenlTXInfoFrame {
@@ -139,6 +142,9 @@ impl GenlAutoConstruct for GenlTXInfoFrame {
         nlas.push(Cookie(self.cookie));
         nlas.push(Signal(self.signal));
         nlas.push(TXInfo(self.tx_info));
+        nlas.push(AddrReceiver(self.addr_receiver));
+        nlas.push(RXRate(self.rx_rate));
+        nlas.push(Freq(self.freq));
 
         NetlinkMessage::new(
             nl_hdr,

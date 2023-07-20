@@ -337,48 +337,51 @@ async fn radio_process(
 
 
                 if msg.is_ack {
-                    msg.flags = 6;
-                    msg.tx_info[0].idx = 0;
-                    msg.tx_info[0].count = 1;
-                    msg.tx_info[1].idx = -1;
-                    msg.tx_info[1].count = 255;
-                    msg.tx_info[2].idx = -1;
-                    msg.tx_info[2].count = 255;
-                    msg.tx_info[3].idx = -1;
-                    msg.tx_info[3].count = 255;
+                    // msg.flags = 6;
+                    // msg.tx_info[0].idx = 0;
+                    // msg.tx_info[0].count = 1;
+                    // msg.tx_info[1].idx = -1;
+                    // msg.tx_info[1].count = 255;
+                    // msg.tx_info[2].idx = -1;
+                    // msg.tx_info[2].count = 255;
+                    // msg.tx_info[3].idx = -1;
+                    // msg.tx_info[3].count = 255;
 
 
-                    let mut tx_info_frame = GenlTXInfoFrame::default();
-                    tx_info_frame.addr_transmitter = msg.addr_transmitter;
-                    tx_info_frame.flags = msg.flags;
-                    tx_info_frame.tx_info = msg.tx_info;
-                    tx_info_frame.cookie = msg.cookie;
-                    tx_info_frame.signal = signal as u32;
+                    // let mut tx_info_frame = GenlTXInfoFrame::default();
+                    // tx_info_frame.addr_transmitter = msg.addr_transmitter;
+                    // tx_info_frame.flags = msg.flags;
+                    // tx_info_frame.tx_info = msg.tx_info;
+                    // tx_info_frame.cookie = msg.cookie;
+                    // tx_info_frame.signal = signal as u32;
 
-                    // if id == 1 {
-                    //     println!("{:?}", &tx_info_frame.cookie);
+                    // // if id == 1 {
+                    // //     println!("{:?}", &tx_info_frame.cookie);
+                    // // }
+
+                    // assert!(msg.addr_transmitter.eq(&radio_info.radio.perm_addr));
+
+                    // match handle.notify(tx_info_frame.generate_genl_message()).await {
+                    //     Ok(_) => {
+                    //         // println!("handle 1 frame tx info");
+
+                    //     }
+                    //     Err(_) => {
+                    //         println!("fail frame tx info: {:?}", tx_info_frame);
+                    //     }
                     // }
-
-                    assert!(msg.addr_transmitter.eq(&radio_info.radio.perm_addr));
-
-                    match handle.notify(tx_info_frame.generate_genl_message()).await {
-                        Ok(_) => {
-                            // println!("handle 1 frame tx info");
-
-                        }
-                        Err(_) => {
-                            println!("fail frame tx info: {:?}", tx_info_frame);
-                        }
-                    }
                 } else {
-                    let mut frame_rx = GenlFrameRX::default();
+                    let mut frame_rx = GenlTXInfoFrame::default();
 
                     frame_rx.rx_rate = msg.tx_info[0].idx as u32;
                     // frame_rx.rx_rate = 0;
                     frame_rx.signal = signal as u32;
                     frame_rx.freq = msg.freq;
-                    frame_rx.frame = msg.frame.clone();
                     frame_rx.addr_receiver = radio_info.radio.perm_addr.clone();
+                    frame_rx.addr_transmitter = msg.addr_transmitter;
+                    frame_rx.flags = msg.flags;
+                    frame_rx.tx_info = msg.tx_info;
+                    frame_rx.cookie = msg.cookie;
 
 
                     // println!("{:?}", &frame_rx.addr_receiver);
@@ -397,22 +400,22 @@ async fn radio_process(
                     }
 
                     // if !is_multicast_ether_addr(msg.frame.header.addr1) && !frame_is_mgmt(msg.frame.header.frame_control) {
-                        msg.is_ack = true;
-                        // println!("{:?}", &msg.frame.header.addr1);
+                        // msg.is_ack = true;
+                        // // println!("{:?}", &msg.frame.header.addr1);
 
-                        for tx in &txs {
-                            if tx.mac.addr.eq(&msg.addr_transmitter) {
-                                // assert!(&tx.mac.hw_addr.ne(&radio_info.radio.perm_addr));
-                                let result = tx.tx.send(msg.clone());
-                                match result {
-                                    Ok(_) => {},
-                                    Err(_) => {
-                                        println!("mpsc send fail");
-                                    },
-                                }
-                                break;
-                            }
-                        }
+                        // for tx in &txs {
+                        //     if tx.mac.addr.eq(&msg.addr_transmitter) {
+                        //         // assert!(&tx.mac.hw_addr.ne(&radio_info.radio.perm_addr));
+                        //         let result = tx.tx.send(msg.clone());
+                        //         match result {
+                        //             Ok(_) => {},
+                        //             Err(_) => {
+                        //                 println!("mpsc send fail");
+                        //             },
+                        //         }
+                        //         break;
+                        //     }
+                        // }
                     // }
 
 

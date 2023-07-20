@@ -11,7 +11,7 @@ trap cleanup EXIT
 
 # 加载mac80211_hwsim模块，创建两个radio
 sudo modprobe mac80211
-cd ../driver
+cd ../driver-new
 sudo insmod mac80211_hwsim.ko
 
 
