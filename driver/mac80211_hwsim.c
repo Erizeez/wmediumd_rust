@@ -3686,6 +3686,8 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	unsigned long flags;
 	bool found = false;
 
+	// goto out;
+
 	if (!info->attrs[HWSIM_ATTR_ADDR_TRANSMITTER] ||
 		!info->attrs[HWSIM_ATTR_FLAGS] ||
 		!info->attrs[HWSIM_ATTR_COOKIE] ||
@@ -3714,6 +3716,7 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	}
 
 	// printk(KERN_INFO "TX info recv");
+	// goto out;
 
 	/* look for the skb matching the cookie passed back from user */
 	spin_lock_irqsave(&data2->pending.lock, flags);
@@ -3788,6 +3791,8 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 		txi->flags |= IEEE80211_TX_STAT_NOACK_TRANSMITTED;
 
 	// goto out;
+
+	// printk(KERN_INFO "");
 
 	ieee80211_tx_status_irqsafe(data2->hw, skb);
 	return 0;
@@ -4262,7 +4267,7 @@ static const struct genl_small_ops hwsim_ops[] = {
 		.cmd = HWSIM_CMD_REGISTER,
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = hwsim_register_received_nl,
-		.flags = GENL_UNS_ADMIN_PERM,
+		// .flags = GENL_UNS_ADMIN_PERM,
 	},
 	{
 		.cmd = HWSIM_CMD_FRAME,
@@ -4278,13 +4283,13 @@ static const struct genl_small_ops hwsim_ops[] = {
 		.cmd = HWSIM_CMD_NEW_RADIO,
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = hwsim_new_radio_nl,
-		.flags = GENL_UNS_ADMIN_PERM,
+		// .flags = GENL_UNS_ADMIN_PERM,
 	},
 	{
 		.cmd = HWSIM_CMD_DEL_RADIO,
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = hwsim_del_radio_nl,
-		.flags = GENL_UNS_ADMIN_PERM,
+		// .flags = GENL_UNS_ADMIN_PERM,
 	},
 	{
 		.cmd = HWSIM_CMD_GET_RADIO,
