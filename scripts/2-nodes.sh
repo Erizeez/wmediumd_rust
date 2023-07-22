@@ -43,7 +43,7 @@ sleep 12
 sudo ip netns exec ns1 ifconfig wlan1 192.168.1.2 up
 
 nohup gnome-terminal --disable-factory -- sudo ip netns exec ns0 bash &
-nohup gnome-terminal --disable-factory -- sudo ip netns exec ns1 bash &
+nohup gnome-terminal --disable-factory -- sudo ip netns exec ns1 iperf3 -s &
 
 # 等待用户输入ctrl-c，防止脚本退出
 echo "Press Ctrl-C to exit"

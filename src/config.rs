@@ -4,7 +4,6 @@ use std::io::Read;
 
 use crate::mac80211_hwsim::constants::ETH_ALEN;
 use crate::structs::GenlNewRadio;
-use crate::{HwsimRadio, HwsimRadios};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Radio {
@@ -51,21 +50,6 @@ pub struct Link {
 pub struct Config {
     pub radios: Vec<Radio>,
     pub links: Vec<Link>,
-}
-
-impl TryInto<HwsimRadios> for Config {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<HwsimRadios, Self::Error> {
-        let mut hwsim_radios = HwsimRadios::default();
-        for radio in &self.radios {
-            hwsim_radios.radios.push(HwsimRadio {
-                addr: radio.perm_addr,
-                hw_addr: radio.perm_addr,
-            })
-        }
-        Ok(hwsim_radios)
-    }
 }
 
 pub fn load_config(config_path: &str) -> Config {

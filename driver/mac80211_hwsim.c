@@ -467,7 +467,7 @@ static const struct ieee80211_sta_s1g_cap hwsim_s1g_cap = {
 			S1G_CAP8_TWT_RESPOND | S1G_CAP8_TWT_REQUEST,
 			0},
 	.nss_mcs = {0xfc | 1, /* MCS 7 for 1 SS */
-				/* RX Highest Supported Long GI Data Rate 0:7 */
+						  /* RX Highest Supported Long GI Data Rate 0:7 */
 				0,
 				/* RX Highest Supported Long GI Data Rate 0:7 */
 				/* TX S1G MCS Map 0:6 */
@@ -3686,8 +3686,6 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	unsigned long flags;
 	bool found = false;
 
-	// goto out;
-
 	if (!info->attrs[HWSIM_ATTR_ADDR_TRANSMITTER] ||
 		!info->attrs[HWSIM_ATTR_FLAGS] ||
 		!info->attrs[HWSIM_ATTR_COOKIE] ||
@@ -3695,15 +3693,13 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 		!info->attrs[HWSIM_ATTR_TX_INFO])
 		goto out;
 
-	src = (u8 *)nla_data(info->attrs[HWSIM_ATTR_ADDR_TRANSMITTER]);
+	src = (void *)nla_data(info->attrs[HWSIM_ATTR_ADDR_TRANSMITTER]);
 	hwsim_flags = nla_get_u32(info->attrs[HWSIM_ATTR_FLAGS]);
 	ret_skb_cookie = nla_get_u64(info->attrs[HWSIM_ATTR_COOKIE]);
 
 	data2 = get_hwsim_data_ref_from_addr(src);
 	if (!data2)
 		goto out;
-
-	// printk(KERN_INFO "TX ", data2);
 
 	if (!hwsim_virtio_enabled)
 	{
@@ -3714,9 +3710,6 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 		if (info->snd_portid != data2->wmediumd)
 			goto out;
 	}
-
-	// printk(KERN_INFO "TX info recv");
-	// goto out;
 
 	/* look for the skb matching the cookie passed back from user */
 	spin_lock_irqsave(&data2->pending.lock, flags);
@@ -3736,29 +3729,18 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	}
 	spin_unlock_irqrestore(&data2->pending.lock, flags);
 
-	// goto out;
-
 	/* not found */
 	if (!found)
-	{
-		printk(KERN_INFO "not found: %lld", ret_skb_cookie);
 		goto out;
-	}
-
-	// goto out;
 
 	/* Tx info received because the frame was broadcasted on user space,
- so we get all the necessary info: tx attempts and skb control buff */
+	 so we get all the necessary info: tx attempts and skb control buff */
 
 	tx_attempts = (struct hwsim_tx_rate *)nla_data(
 		info->attrs[HWSIM_ATTR_TX_INFO]);
 
-	// goto out;
-
 	/* now send back TX status */
 	txi = IEEE80211_SKB_CB(skb);
-
-	// goto out;
 
 	ieee80211_tx_info_clear_status(txi);
 
@@ -3769,11 +3751,6 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 	}
 
 	txi->status.ack_signal = nla_get_u32(info->attrs[HWSIM_ATTR_SIGNAL]);
-
-	// printk(KERN_INFO "%d", !(hwsim_flags & HWSIM_TX_CTL_NO_ACK));
-	// printk(KERN_INFO "%d", (hwsim_flags & HWSIM_TX_STAT_ACK));
-
-	// goto out;
 
 	if (!(hwsim_flags & HWSIM_TX_CTL_NO_ACK) &&
 		(hwsim_flags & HWSIM_TX_STAT_ACK))
@@ -3789,10 +3766,6 @@ static int hwsim_tx_info_frame_received_nl(struct sk_buff *skb_2,
 
 	if (hwsim_flags & HWSIM_TX_CTL_NO_ACK)
 		txi->flags |= IEEE80211_TX_STAT_NOACK_TRANSMITTED;
-
-	// goto out;
-
-	// printk(KERN_INFO "");
 
 	ieee80211_tx_status_irqsafe(data2->hw, skb);
 	return 0;
@@ -4267,7 +4240,7 @@ static const struct genl_small_ops hwsim_ops[] = {
 		.cmd = HWSIM_CMD_REGISTER,
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = hwsim_register_received_nl,
-		// .flags = GENL_UNS_ADMIN_PERM,
+		.flags = GENL_UNS_ADMIN_PERM,
 	},
 	{
 		.cmd = HWSIM_CMD_FRAME,
@@ -4283,13 +4256,13 @@ static const struct genl_small_ops hwsim_ops[] = {
 		.cmd = HWSIM_CMD_NEW_RADIO,
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = hwsim_new_radio_nl,
-		// .flags = GENL_UNS_ADMIN_PERM,
+		.flags = GENL_UNS_ADMIN_PERM,
 	},
 	{
 		.cmd = HWSIM_CMD_DEL_RADIO,
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = hwsim_del_radio_nl,
-		// .flags = GENL_UNS_ADMIN_PERM,
+		.flags = GENL_UNS_ADMIN_PERM,
 	},
 	{
 		.cmd = HWSIM_CMD_GET_RADIO,
