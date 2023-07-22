@@ -4443,10 +4443,6 @@ static int hwsim_virtio_handle_cmd(struct sk_buff *skb)
 
 	nlh = nlmsg_hdr(skb);
 	gnlh = nlmsg_data(nlh);
-
-	if (skb->len < nlh->nlmsg_len)
-		return -EINVAL;
-
 	err = genlmsg_parse(nlh, &hwsim_genl_family, tb, HWSIM_ATTR_MAX,
 						hwsim_genl_policy, NULL);
 	if (err)
@@ -4457,18 +4453,18 @@ static int hwsim_virtio_handle_cmd(struct sk_buff *skb)
 
 	info.attrs = tb;
 
-	// switch (gnlh->cmd)
-	// {
-	// case HWSIM_CMD_FRAME:
-	// 	hwsim_cloned_frame_received_nl(skb, &info);
-	// 	break;
-	// case HWSIM_CMD_TX_INFO_FRAME:
-	// 	hwsim_tx_info_frame_received_nl(skb, &info);
-	// 	break;
-	// default:
-	// 	pr_err_ratelimited("hwsim: invalid cmd: %d\n", gnlh->cmd);
-	// 	return -EPROTO;
-	// }
+	switch (gnlh->cmd)
+	{
+	case HWSIM_CMD_FRAME:
+		// hwsim_cloned_frame_received_nl(skb, &info);
+		break;
+	case HWSIM_CMD_RX:
+		// hwsim_tx_info_frame_received_nl(skb, &info);
+		break;
+	default:
+		pr_err_ratelimited("hwsim: invalid cmd: %d\n", gnlh->cmd);
+		return -EPROTO;
+	}
 	return 0;
 }
 
@@ -4491,8 +4487,7 @@ static void hwsim_virtio_rx_work(struct work_struct *work)
 	spin_unlock_irqrestore(&hwsim_virtio_lock, flags);
 
 	skb->data = skb->head;
-	skb_reset_tail_pointer(skb);
-	skb_put(skb, len);
+	skb_set_tail_pointer(skb, len);
 	hwsim_virtio_handle_cmd(skb);
 
 	spin_lock_irqsave(&hwsim_virtio_lock, flags);

@@ -46,6 +46,7 @@ impl GenlAutoConstruct for GenlFrameTX {
 
     fn parse(data: GenlMAC) -> Self {
         let mut parsed_data = GenlFrameTX::default();
+        parsed_data.addr_transmitter = [0; 6];
         for attr in &data.nlas {
             use HwsimAttrs::*;
             match attr {
@@ -73,6 +74,7 @@ impl GenlAutoConstruct for GenlFrameTX {
                 _ => {}
             }
         }
+
         parsed_data
     }
 }

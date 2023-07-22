@@ -189,6 +189,7 @@ async fn radio_process(
     mut terminate_rx: broadcast::Receiver<()>,
 ) {
     println!("Spawning the {} link.", &id);
+    println!("{:?}", &txs);
     // dbg!(template);
 
     // Prepare netns and ..
@@ -257,35 +258,41 @@ async fn radio_process(
                                     continue;
                                 }
 
-                                let mut data = parse_genl_message::<GenlFrameTX>(frame);
+                                let data = parse_genl_message::<GenlFrameTX>(frame);
 
-                                if (0x01 & data.frame.header.addr1[0]) != 0 {
-                                    txs.iter().for_each(|tx| {
+                                // println!("id: {}", &data.cookie);
+                                // println!("id: {} {:?}", &data.cookie, &data.addr_transmitter);
 
+                                // if (0x01 & data.frame.header.addr1[0]) == 0 {
+
+                                    for tx in &txs {
                                         let result = tx.tx.send(data.clone());
                                         match result {
                                             Ok(_) => {
-                                                // println!("mpsc send success");
+                                                // println!("multicast");
                                             },
                                             Err(_) => {
                                                 println!("mpsc send fail");
                                             },
                                         }
-                                    })
-                                } else {
-                                    for tx in &txs {
-                                        if tx.mac.addr.eq(&data.frame.header.addr1) {
-                                            let result = tx.tx.send(data.clone());
-                                            match result {
-                                                Ok(_) => {},
-                                                Err(_) => {
-                                                    println!("mpsc send fail");
-                                                },
-                                            }
-                                            break;
-                                        }
                                     }
-                                }
+                                // } else {
+
+                                //     for tx in &txs {
+                                //         if tx.mac.addr.eq(&data.frame.header.addr1) {
+                                //             let result = tx.tx.send(data.clone());
+                                //             match result {
+                                //                 Ok(_) => {
+                                //                     println!("unicast");
+                                //                 },
+                                //                 Err(_) => {
+                                //                     println!("mpsc send fail");
+                                //                 },
+                                //             }
+                                //             break;
+                                //         }
+                                //     }
+                                // }
 
                             }
                             Err(_) => {}
@@ -299,13 +306,16 @@ async fn radio_process(
 
                 let mut frame_rx = GenlTXInfoFrame::default();
 
+                // println!("id: {} {:?}", &msg.cookie, &msg.addr_transmitter);
+
+
                 frame_rx.rx_rate = msg.tx_info[0].idx as u32;
                 frame_rx.signal = signal as u32;
                 frame_rx.freq = msg.freq;
                 frame_rx.addr_receiver = radio_info.radio.perm_addr.clone();
-                frame_rx.addr_transmitter = msg.addr_transmitter;
+                frame_rx.addr_transmitter = msg.addr_transmitter.clone();
                 frame_rx.flags = msg.flags;
-                frame_rx.tx_info = msg.tx_info;
+                frame_rx.tx_info = msg.tx_info.clone();
                 frame_rx.cookie = msg.cookie;
 
                 match handle.notify(frame_rx.generate_genl_message()).await {
