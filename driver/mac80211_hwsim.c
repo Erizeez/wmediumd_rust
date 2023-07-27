@@ -50,7 +50,7 @@
 // 2048 pages
 #define MAX_PAGE_ORDER_PER_RADIO 15
 // 1024 pages
-#define DEFAULT_PAGE_ORDER_PER_RADIO 4
+#define DEFAULT_PAGE_ORDER_PER_RADIO 12
 
 MODULE_AUTHOR("Jouni Malinen");
 MODULE_DESCRIPTION("Software simulator of 802.11 radio(s) for mac80211");

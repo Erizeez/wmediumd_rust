@@ -58,7 +58,7 @@ mod structs;
 
 pub const MAX_PAGE_NUM_PER_RADIO: usize = 64;
 pub const MAX_PAGE_ORDER_PER_RADIO: usize = 15;
-pub const DEFAULT_PAGE_ORDER_PER_RADIO: usize = 4;
+pub const DEFAULT_PAGE_ORDER_PER_RADIO: usize = 12;
 pub const PAGE_SHIFT: usize = 12;
 pub const PAGE_SIZE: usize = 1 << PAGE_SHIFT;
 

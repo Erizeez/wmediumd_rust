@@ -217,8 +217,6 @@ dependencies = [
 [[package]]
 name = "genetlink"
 version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1bc23d478336747f4317fb34e4f1a6c3d0030caf756e057708e2677afceafad"
 dependencies = [
  "futures",
  "log",
@@ -396,8 +394,6 @@ dependencies = [
 [[package]]
 name = "netlink-proto"
 version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26305d12193227ef7b8227e7d61ae4eaf174607f79bd8eeceff07aacaefde497"
 dependencies = [
  "bytes",
  "futures",
