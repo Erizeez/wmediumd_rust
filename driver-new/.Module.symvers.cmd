@@ -1,0 +1,1 @@
+cmd_/media/psf/Code/wmediumd_rust/driver-new/Module.symvers := sed 's/\.ko$$/\.o/' /media/psf/Code/wmediumd_rust/driver-new/modules.order | scripts/mod/modpost -m -a  -o /media/psf/Code/wmediumd_rust/driver-new/Module.symvers -e -i Module.symvers   -T -

@@ -1,0 +1,1 @@
+cmd_/media/psf/Code/wmediumd_rust/driver-new/mac80211_hwsim.mod := { echo  /media/psf/Code/wmediumd_rust/driver-new/mac80211_hwsim.o;  echo; } > /media/psf/Code/wmediumd_rust/driver-new/mac80211_hwsim.mod
