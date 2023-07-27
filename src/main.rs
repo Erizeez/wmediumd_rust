@@ -1,12 +1,22 @@
+use std::{
+    io::{self},
+    mem,
+    os::fd::AsRawFd,
+    task::{Context, Poll},
+};
+
 use futures::StreamExt;
 use genetlink::{self, new_connection};
+use libc::{setsockopt, SOL_SOCKET, SO_RCVBUF, SO_SNDBUF};
 use netlink_packet_utils::ParseableParametrized;
+use netlink_sys::{AsyncSocket, Socket, SocketAddr};
 use structs::{GenlFrameRX, GenlFrameTX, GenlRegister, GenlTXInfoFrame};
 
 use self::mac80211_hwsim::ctrl::*;
 
 mod config;
 mod mac80211_hwsim;
+mod mysocket;
 mod structs;
 
 #[tokio::main]
@@ -15,8 +25,19 @@ async fn main() {
 }
 
 async fn radio_process() {
-    let (conn, mut handle, mut receiver) = new_connection().expect("Failed to create connection.");
+    let (mut conn, mut handle, mut receiver) =
+        new_connection().expect("Failed to create connection.");
+
+    let raw_fd = conn.socket_mut().as_raw_fd();
+    let buffer_len = 1024 * 1024 * 1;
     tokio::spawn(conn);
+
+    unsafe {
+        let payload = &buffer_len as *const i32 as *const libc::c_void;
+        let payload_len = mem::size_of::<i32>() as libc::socklen_t;
+        setsockopt(raw_fd, SOL_SOCKET, SO_SNDBUF, payload, payload_len);
+        setsockopt(raw_fd, SOL_SOCKET, SO_RCVBUF, payload, payload_len);
+    }
 
     // Register wmediumd using genetlink
     let genl_register = GenlRegister {};
@@ -30,7 +51,7 @@ async fn radio_process() {
         let msg = if let Some(msg) = receiver.next().await {
             msg.0
         } else {
-            panic!("receiver.next() returned None");
+            continue;
         };
 
         match msg.payload {
@@ -69,23 +90,23 @@ async fn radio_process() {
 
                         match handle.notify(frame_rx.generate_genl_message()).await {
                             Ok(_) => {
-                                println!("handle 1 frame rx");
+                                // println!("handle 1 frame rx");
                             }
                             Err(_) => {
                                 println!("fail frame rx");
-                                panic!("fail frame rx");
+                                // panic!("fail frame rx");
                             }
                         }
 
-                        match handle.notify(tx_info_frame.generate_genl_message()).await {
-                            Ok(_) => {
-                                // println!("handle 1 frame tx info");
-                            }
-                            Err(_) => {
-                                println!("fail frame tx info");
-                                panic!("fail frame tx info");
-                            }
-                        }
+                        // match handle.notify(tx_info_frame.generate_genl_message()).await {
+                        //     Ok(_) => {
+                        //         // println!("handle 1 frame tx info");
+                        //     }
+                        //     Err(_) => {
+                        //         println!("fail frame tx info");
+                        //         panic!("fail frame tx info");
+                        //     }
+                        // }
                     }
                     Err(_) => {}
                 }

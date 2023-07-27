@@ -13,7 +13,7 @@ runner = 'sudo -E'
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-genetlink = "0.2.4"
+genetlink = { path = "./genetlink" }
 netlink-packet-core = "0.5.0"
 netlink-packet-generic = "0.3.2"
 netlink-packet-utils = "0.5.2"
@@ -27,4 +27,5 @@ serde_yaml = "0.9.22"
 libc = "0.2.147"
 netns-rs = "0.1.0"
 tokio-tungstenite = "0.19.0"
+bytes = "1.4.0"
 #futures-async-stream = "0.2.6"
